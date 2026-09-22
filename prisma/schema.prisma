@@ -1,0 +1,269 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OpportunitySource {
+  INBOUND
+  OUTBOUND
+  REFERRAL
+  PARTNER
+}
+
+enum OpportunityStage {
+  NEW
+  CONTACTED
+  INTERESTED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum InteractionType {
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  CALL
+  MEETING
+  NOTE
+  PROPOSAL_SENT
+  PROPOSAL_REQUESTED
+}
+
+enum GTMActionType {
+  REQUEST_MORE_INFORMATION
+  RESEARCH_COMPANY
+  SEND_INTRODUCTION
+  SEND_CASE_STUDY
+  SEND_CAMPAIGN_PROPOSAL
+  SCHEDULE_DISCOVERY_CALL
+  FOLLOW_UP
+  PREPARE_PRICING
+  ESCALATE_TO_SALES
+  WAIT
+  CLOSE_OPPORTUNITY
+}
+
+enum DecisionPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum DecisionStatus {
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+  DEFERRED
+  EXECUTED
+  FAILED
+}
+
+enum EvidenceSourceType {
+  COMPANY
+  OPPORTUNITY
+  INTERACTION
+  SYSTEM
+}
+
+enum ApprovalStatus {
+  APPROVED
+  REJECTED
+  DEFERRED
+}
+
+enum ExecutionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum OutcomeType {
+  EMAIL_OPENED
+  REPLIED
+  MEETING_BOOKED
+  PROPOSAL_ACCEPTED
+  PROPOSAL_REJECTED
+  OPPORTUNITY_WON
+  OPPORTUNITY_LOST
+}
+
+model Company {
+  id       String  @id @default(uuid())
+  name     String
+  website  String?
+  industry String?
+
+  opportunities Opportunity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Opportunity {
+  id        String @id @default(uuid())
+  companyId String
+
+  title  String
+  source OpportunitySource
+  stage  OpportunityStage  @default(NEW)
+
+  estimatedBudget Decimal? @db.Decimal(12, 2)
+  objective       String?
+
+  lastInteractionAt DateTime?
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  interactions Interaction[]
+  decisions    GTMDecision[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([stage])
+  @@index([companyId, stage])
+}
+
+model Interaction {
+  id            String @id @default(uuid())
+  opportunityId String
+
+  type    InteractionType
+  summary String
+
+  occurredAt DateTime
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([opportunityId])
+  @@index([opportunityId, occurredAt])
+}
+
+model GTMDecision {
+  id            String @id @default(uuid())
+  opportunityId String
+
+  action   GTMActionType
+  priority DecisionPriority
+  status   DecisionStatus   @default(AWAITING_APPROVAL)
+
+  summary    String
+  reasoning  String[]
+  confidence Decimal  @db.Decimal(5, 4)
+
+  inputSnapshot  Json
+  proposedAction Json
+
+  modelVersion  String
+  promptVersion String
+  policyVersion String
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  evidence    Evidence[]
+  approvals   Approval[]
+  executions  Execution[]
+  outcomes    Outcome[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([opportunityId, createdAt])
+  @@index([status])
+}
+
+model Evidence {
+  id         String @id @default(uuid())
+  decisionId String
+
+  sourceType EvidenceSourceType
+  sourceId   String?
+
+  claim String
+  value String?
+
+  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([decisionId])
+  @@index([sourceType, sourceId])
+}
+
+model Approval {
+  id         String @id @default(uuid())
+  decisionId String
+
+  status ApprovalStatus
+
+  actorId   String
+  actorName String?
+
+  comment String?
+
+  actionSnapshot Json
+
+  decision   GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  executions Execution[]
+
+  createdAt DateTime @default(now())
+
+  @@index([decisionId, createdAt])
+  @@index([actorId])
+}
+
+model Execution {
+  id         String @id @default(uuid())
+  decisionId String
+  approvalId String
+
+  action GTMActionType
+  status ExecutionStatus @default(PENDING)
+
+  actionSnapshot Json
+  result         Json?
+
+  errorMessage String?
+
+  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  approval Approval    @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+
+  createdAt  DateTime  @default(now())
+  executedAt DateTime?
+
+  @@index([decisionId, createdAt])
+  @@index([approvalId])
+  @@index([status])
+}
+
+model Outcome {
+  id         String @id @default(uuid())
+  decisionId String
+
+  type OutcomeType
+
+  value    Decimal? @db.Decimal(14, 2)
+  metadata Json?
+
+  occurredAt DateTime
+
+  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([decisionId, occurredAt])
+  @@index([type])
+}
