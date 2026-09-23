@@ -17,6 +17,7 @@ export const createOpportunitySchema = z.object({
     "NEW",
     "CONTACTED",
     "INTERESTED",
+    "PROPOSAL",
     "NEGOTIATION",
     "WON",
     "LOST",

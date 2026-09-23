@@ -1,3 +1,8 @@
+import {
+  safeParseOpportunityV1,
+  type OpportunityV1,
+} from "@sponzilla/contracts/v1";
+
 import { decisionContextRepository } from "./decision-context.repository.js";
 
 import type {
@@ -9,6 +14,21 @@ export class DecisionOpportunityNotFoundError extends Error {
     super("Opportunity not found");
     this.name = "DecisionOpportunityNotFoundError";
   }
+}
+
+function parseIntelligenceSnapshot(
+  snapshot: unknown,
+): OpportunityV1 | null {
+  if (snapshot == null) {
+    return null;
+  }
+
+  const parsed = safeParseOpportunityV1(snapshot);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data;
 }
 
 export const decisionContextService = {
@@ -23,6 +43,10 @@ export const decisionContextService = {
     if (!record) {
       throw new DecisionOpportunityNotFoundError();
     }
+
+    const intelligence = parseIntelligenceSnapshot(
+      record.intelligenceSnapshot,
+    );
 
     return {
       company: {
@@ -45,6 +69,9 @@ export const decisionContextService = {
 
         lastInteractionAt:
           record.lastInteractionAt,
+
+        externalId: record.externalId,
+        origin: record.origin,
       },
 
       interactions: record.interactions.map(
@@ -55,6 +82,8 @@ export const decisionContextService = {
           occurredAt: interaction.occurredAt,
         }),
       ),
+
+      intelligence,
     };
   },
 };

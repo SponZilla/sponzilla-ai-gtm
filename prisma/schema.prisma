@@ -124,6 +124,15 @@ model Opportunity {
 
   lastInteractionAt DateTime?
 
+  /** MI OpportunityV1.id — stable external reference across ingest upserts. */
+  externalId String? @unique
+
+  /** Full validated OpportunityV1 JSON for Decision Context (contract ≠ CRM columns). */
+  intelligenceSnapshot Json?
+
+  /** Provenance from OpportunityV1.origin (e.g. MARKET_INTELLIGENCE). */
+  origin String?
+
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   interactions Interaction[]
   decisions    GTMDecision[]

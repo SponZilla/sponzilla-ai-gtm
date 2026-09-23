@@ -1,10 +1,26 @@
-import { Prisma } from "../../generated/prisma/client.js";
+import {
+  Prisma,
+  type OpportunitySource,
+  type OpportunityStage,
+} from "../../generated/prisma/client.js";
 
 import { prisma } from "../../lib/prisma.js";
 
 import type {
   CreateOpportunityInput,
 } from "./opportunity.validator.js";
+
+export interface UpsertOpportunityFromIntelligenceInput {
+  externalId: string;
+  companyId: string;
+  title: string;
+  source: OpportunitySource;
+  stage: OpportunityStage;
+  objective: string;
+  estimatedBudget: null;
+  origin: string;
+  intelligenceSnapshot: Prisma.InputJsonValue;
+}
 
 export const opportunityRepository = {
   create(input: CreateOpportunityInput) {
@@ -48,6 +64,37 @@ export const opportunityRepository = {
       },
       orderBy: {
         createdAt: "desc",
+      },
+    });
+  },
+
+  upsertFromIntelligence(
+    input: UpsertOpportunityFromIntelligenceInput,
+  ) {
+    return prisma.opportunity.upsert({
+      where: {
+        externalId: input.externalId,
+      },
+      create: {
+        companyId: input.companyId,
+        title: input.title,
+        source: input.source,
+        stage: input.stage,
+        objective: input.objective,
+        estimatedBudget: input.estimatedBudget,
+        externalId: input.externalId,
+        origin: input.origin,
+        intelligenceSnapshot: input.intelligenceSnapshot,
+      },
+      update: {
+        companyId: input.companyId,
+        title: input.title,
+        objective: input.objective,
+        origin: input.origin,
+        intelligenceSnapshot: input.intelligenceSnapshot,
+      },
+      include: {
+        company: true,
       },
     });
   },

@@ -6,9 +6,47 @@ import {
 } from "./opportunity.service.js";
 
 import {
+  OpportunityNotQualifiedError,
+  OpportunityV1ValidationError,
+  opportunityIngestService,
+} from "./opportunity.ingest.service.js";
+
+import {
   createOpportunitySchema,
   opportunityIdSchema,
 } from "./opportunity.validator.js";
+
+export async function ingestOpportunity(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const result = await opportunityIngestService.ingest(
+      req.body,
+    );
+
+    return res.status(201).json({
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof OpportunityV1ValidationError) {
+      return res.status(400).json({
+        error: "INVALID_OPPORTUNITY_V1",
+        details: error.details,
+      });
+    }
+
+    if (error instanceof OpportunityNotQualifiedError) {
+      return res.status(422).json({
+        error: "OPPORTUNITY_NOT_QUALIFIED",
+        message:
+          "NO_VERIFIED_OPPORTUNITY payloads are rejected for GTM pipeline creation",
+      });
+    }
+
+    throw error;
+  }
+}
 
 export async function createOpportunity(
   req: Request,

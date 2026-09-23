@@ -1,0 +1,36 @@
+{
+  "name": "@sponzilla/contracts",
+  "version": "1.0.0",
+  "description": "Canonical versioned domain contracts shared by Market Intelligence (producer) and AI-GTM (consumer).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./v1": {
+      "types": "./dist/v1/index.d.ts",
+      "default": "./dist/v1/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "zod": "^3.22.0 || ^4.0.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

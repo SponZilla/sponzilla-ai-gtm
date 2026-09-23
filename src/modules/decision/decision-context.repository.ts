@@ -15,6 +15,9 @@ export const decisionContextRepository = {
         estimatedBudget: true,
         objective: true,
         lastInteractionAt: true,
+        externalId: true,
+        origin: true,
+        intelligenceSnapshot: true,
 
         company: {
           select: {

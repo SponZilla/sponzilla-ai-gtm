@@ -1,3 +1,5 @@
+import type { OpportunityV1 } from "@sponzilla/contracts/v1";
+
 import type {
   InteractionType,
   OpportunitySource,
@@ -26,10 +28,14 @@ export interface GTMOpportunityContext {
   estimatedBudget: string | null;
   objective: string | null;
   lastInteractionAt: Date | null;
+  externalId: string | null;
+  origin: string | null;
 }
 
 export interface GTMDecisionContext {
   company: GTMCompanyContext;
   opportunity: GTMOpportunityContext;
   interactions: GTMInteractionContext[];
+  /** Canonical MI handoff payload when ingested; null for manual CRM-only deals. */
+  intelligence: OpportunityV1 | null;
 }
