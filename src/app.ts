@@ -7,6 +7,7 @@ import { notFoundHandler } from "./middleware/not-found.js";
 import { opportunityRouter } from "./modules/opportunity/opportunity.routes.js";
 import { interactionRouter } from "./modules/interaction/interaction.routes.js";
 import { decisionRouter } from "./modules/decision/decision.routes.js";
+import { marketIntelligenceRouter } from "./modules/market-intelligence/market-intelligence.routes.js";
 
 export const app = express();
 
@@ -36,6 +37,11 @@ app.use(
 app.use(
   "/api/interactions",
   interactionRouter,
+);
+
+app.use(
+  "/api/v1/market-intelligence",
+  marketIntelligenceRouter,
 );
 
 app.use(

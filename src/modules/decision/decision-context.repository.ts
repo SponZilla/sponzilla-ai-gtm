@@ -42,6 +42,23 @@ export const decisionContextRepository = {
 
           take: 20,
         },
+
+         marketIntelligence: {
+          select: {
+            contractVersion: true,
+
+            audience: true,
+            marketingNeed: true,
+            interpretation: true,
+            inferenceConfidence: true,
+
+            recommendation: true,
+            nextActionHint: true,
+
+            signals: true,
+            evidence: true,
+          },
+        },
       },
     });
   },

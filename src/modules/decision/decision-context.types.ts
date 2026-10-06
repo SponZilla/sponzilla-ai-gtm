@@ -32,10 +32,48 @@ export interface GTMOpportunityContext {
   origin: string | null;
 }
 
+export interface GTMMarketSignalContext {
+  type: string;
+  description: string;
+  detectedAt: Date;
+  sourceUrl: string | null;
+}
+
+export interface GTMMarketEvidenceContext {
+  fact: string;
+  sourceUrl: string | null;
+  sourceTitle: string | null;
+  confidence: number;
+}
+
+export interface GTMMarketAIInferenceContext {
+  audience: string[];
+  marketingNeed: string;
+  interpretation: string;
+  confidence: number;
+}
+
+export interface GTMMarketRecommendationContext {
+  recommendation: string;
+  nextActionHint: string;
+}
+
+export interface GTMMarketIntelligenceContext {
+  contractVersion: string;
+  signals: GTMMarketSignalContext[];
+  evidence: GTMMarketEvidenceContext[];
+  aiInference: GTMMarketAIInferenceContext | null;
+  recommendation: GTMMarketRecommendationContext | null;
+}
+
 export interface GTMDecisionContext {
   company: GTMCompanyContext;
   opportunity: GTMOpportunityContext;
   interactions: GTMInteractionContext[];
+
   /** Canonical MI handoff payload when ingested; null for manual CRM-only deals. */
   intelligence: OpportunityV1 | null;
+
+  /** Structured Market Intelligence context used by the GTM decision engine. */
+  marketIntelligence: GTMMarketIntelligenceContext | null;
 }

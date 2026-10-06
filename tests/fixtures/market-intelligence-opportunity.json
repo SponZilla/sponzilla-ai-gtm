@@ -1,0 +1,40 @@
+{
+  "contractVersion": "v1",
+   "opportunityId": "mi_opp_001",
+  "company": {
+    "name": "ASUS India",
+    "website": "https://www.asus.com/in/",
+    "industry": "Consumer Electronics",
+    "location": "India"
+  },
+  "signals": [
+    {
+      "type": "PRODUCT_LAUNCH",
+      "description": "Company launched a new gaming product in India.",
+      "detectedAt": "2026-09-25",
+      "sourceUrl": "https://example.com/source"
+    }
+  ],
+  "evidence": [
+    {
+      "fact": "ASUS launched a new gaming product in India.",
+      "sourceUrl": "https://example.com/source",
+      "sourceTitle": "Example Source",
+      "confidence": 0.95
+    }
+  ],
+  "aiInference": {
+    "audience": [
+      "Students",
+      "Gamers",
+      "Creators"
+    ],
+    "marketingNeed": "Build awareness and product discovery among student gaming communities.",
+    "interpretation": "Student gaming communities could provide a relevant ground-level distribution and activation channel.",
+    "confidence": 0.82
+  },
+  "recommendation": {
+    "recommendation": "Investigate a campus gaming activation opportunity.",
+    "nextActionHint": "Identify relevant university gaming communities and marketing decision-maker."
+  }
+}
