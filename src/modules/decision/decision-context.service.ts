@@ -3,44 +3,91 @@ import {
   type OpportunityV1,
 } from "@sponzilla/contracts/v1";
 
-import { z } from "zod";
+import {
+  z,
+} from "zod";
 
-import { decisionContextRepository } from "./decision-context.repository.js";
+import {
+  decisionContextRepository,
+} from "./decision-context.repository.js";
+
+import {
+  decisionHistoryService,
+} from "./decision-history.service.js";
 
 import type {
   GTMDecisionContext,
 } from "./decision-context.types.js";
 
+/*
+ * Stored Market Intelligence validation.
+ *
+ * These schemas protect the decision layer
+ * from malformed JSON stored in the database.
+ */
 const storedSignalSchema = z.object({
   type: z.string(),
+
   description: z.string(),
-  detectedAt: z.string().date(),
-  sourceUrl: z.string().nullable().optional(),
+
+  detectedAt:
+    z.string().date(),
+
+  sourceUrl:
+    z.string()
+      .nullable()
+      .optional(),
 });
 
 const storedEvidenceSchema = z.object({
   fact: z.string(),
-  sourceUrl: z.string().nullable().optional(),
-  sourceTitle: z.string().nullable().optional(),
-  confidence: z.number().min(0).max(1),
+
+  sourceUrl:
+    z.string()
+      .nullable()
+      .optional(),
+
+  sourceTitle:
+    z.string()
+      .nullable()
+      .optional(),
+
+  confidence:
+    z.number()
+      .min(0)
+      .max(1),
 });
 
-const storedSignalsSchema = z.array(
-  storedSignalSchema,
-);
+const storedSignalsSchema =
+  z.array(
+    storedSignalSchema,
+  );
 
-const storedEvidenceListSchema = z.array(
-  storedEvidenceSchema,
-);
+const storedEvidenceListSchema =
+  z.array(
+    storedEvidenceSchema,
+  );
 
-export class DecisionOpportunityNotFoundError extends Error {
+export class DecisionOpportunityNotFoundError
+  extends Error {
   constructor() {
-    super("Opportunity not found");
+    super(
+      "Opportunity not found",
+    );
+
     this.name =
       "DecisionOpportunityNotFoundError";
   }
 }
 
+/**
+ * Safely parses the canonical Market
+ * Intelligence OpportunityV1 snapshot.
+ *
+ * Invalid or unavailable snapshots are
+ * treated as absent rather than crashing
+ * decision-context generation.
+ */
 function parseIntelligenceSnapshot(
   snapshot: unknown,
 ): OpportunityV1 | null {
@@ -49,7 +96,9 @@ function parseIntelligenceSnapshot(
   }
 
   const parsed =
-    safeParseOpportunityV1(snapshot);
+    safeParseOpportunityV1(
+      snapshot,
+    );
 
   if (!parsed.success) {
     return null;
@@ -62,19 +111,37 @@ export const decisionContextService = {
   async build(
     opportunityId: string,
   ): Promise<GTMDecisionContext> {
+    /*
+     * Load the primary opportunity context.
+     */
     const record =
-      await decisionContextRepository.findOpportunityContext(
-        opportunityId,
-      );
+      await decisionContextRepository
+        .findOpportunityContext(
+          opportunityId,
+        );
 
     if (!record) {
       throw new DecisionOpportunityNotFoundError();
     }
 
     /*
+     * Build historical GTM context only after
+     * confirming that the opportunity exists.
+     *
+     * This includes previous executed decisions
+     * and their recorded outcomes.
+     */
+    const history =
+      await decisionHistoryService
+        .buildForOpportunity(
+          opportunityId,
+        );
+
+    /*
      * Canonical Market Intelligence handoff.
-     * This comes from the intelligenceSnapshot
-     * introduced by the remote implementation.
+     *
+     * This preserves the OpportunityV1 payload
+     * stored in intelligenceSnapshot.
      */
     const intelligence =
       parseIntelligenceSnapshot(
@@ -82,22 +149,27 @@ export const decisionContextService = {
       );
 
     /*
-     * Structured Market Intelligence context
-     * used directly by the GTM decision engine.
+     * Normalized Market Intelligence context
+     * consumed directly by the GTM decision
+     * engine.
      */
     let marketIntelligence:
       GTMDecisionContext["marketIntelligence"] =
       null;
 
-    if (record.marketIntelligence) {
+    if (
+      record.marketIntelligence
+    ) {
       const storedSignals =
         storedSignalsSchema.parse(
-          record.marketIntelligence.signals,
+          record.marketIntelligence
+            .signals,
         );
 
       const storedEvidence =
         storedEvidenceListSchema.parse(
-          record.marketIntelligence.evidence,
+          record.marketIntelligence
+            .evidence,
         );
 
       marketIntelligence = {
@@ -105,37 +177,44 @@ export const decisionContextService = {
           record.marketIntelligence
             .contractVersion,
 
-        signals: storedSignals.map(
-          (signal) => ({
-            type: signal.type,
+        signals:
+          storedSignals.map(
+            (signal) => ({
+              type:
+                signal.type,
 
-            description:
-              signal.description,
+              description:
+                signal.description,
 
-            detectedAt: new Date(
-              signal.detectedAt,
-            ),
+              detectedAt:
+                new Date(
+                  signal.detectedAt,
+                ),
 
-            sourceUrl:
-              signal.sourceUrl ?? null,
-          }),
-        ),
+              sourceUrl:
+                signal.sourceUrl ??
+                null,
+            }),
+          ),
 
-        evidence: storedEvidence.map(
-          (evidence) => ({
-            fact:
-              evidence.fact,
+        evidence:
+          storedEvidence.map(
+            (evidence) => ({
+              fact:
+                evidence.fact,
 
-            sourceUrl:
-              evidence.sourceUrl ?? null,
+              sourceUrl:
+                evidence.sourceUrl ??
+                null,
 
-            sourceTitle:
-              evidence.sourceTitle ?? null,
+              sourceTitle:
+                evidence.sourceTitle ??
+                null,
 
-            confidence:
-              evidence.confidence,
-          }),
-        ),
+              confidence:
+                evidence.confidence,
+            }),
+          ),
 
         aiInference: {
           audience:
@@ -150,10 +229,11 @@ export const decisionContextService = {
             record.marketIntelligence
               .interpretation,
 
-          confidence: Number(
-            record.marketIntelligence
-              .inferenceConfidence,
-          ),
+          confidence:
+            Number(
+              record.marketIntelligence
+                .inferenceConfidence,
+            ),
         },
 
         recommendation: {
@@ -168,6 +248,12 @@ export const decisionContextService = {
       };
     }
 
+    /*
+     * Final decision context.
+     *
+     * This is the single structured input
+     * available to the GTM decision layer.
+     */
     return {
       company: {
         id:
@@ -197,7 +283,8 @@ export const decisionContextService = {
           record.stage,
 
         estimatedBudget:
-          record.estimatedBudget?.toString() ??
+          record.estimatedBudget
+            ?.toString() ??
           null,
 
         objective:
@@ -231,16 +318,25 @@ export const decisionContextService = {
         ),
 
       /*
-       * Preserve both MI representations:
-       *
-       * intelligence:
-       * canonical OpportunityV1 payload.
-       *
-       * marketIntelligence:
-       * normalized decision-engine context.
+       * Canonical Market Intelligence
+       * representation.
        */
       intelligence,
+
+      /*
+       * Normalized Market Intelligence
+       * representation.
+       */
       marketIntelligence,
+
+      /*
+       * Historical GTM feedback.
+       *
+       * Previous executed decisions and
+       * recorded outcomes can now be used
+       * by future decision generation.
+       */
+      history,
     };
   },
 };

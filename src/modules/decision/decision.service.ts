@@ -1,4 +1,5 @@
-import type {
+
+import {
   Prisma,
 } from "../../generated/prisma/client.js";
 
@@ -23,10 +24,31 @@ const DECISION_PROMPT_VERSION =
 const DECISION_POLICY_VERSION =
   "gtm-policy-v1";
 
+export class PendingDecisionExistsError
+  extends Error {
+  readonly decisionId: string;
+
+  constructor(
+    decisionId: string,
+  ) {
+    super(
+      "An unresolved GTM decision already exists for this opportunity.",
+    );
+
+    this.name =
+      "PendingDecisionExistsError";
+
+    this.decisionId =
+      decisionId;
+  }
+}
+
 export const decisionService = {
-  async generate(opportunityId: string) {
+  async generate(
+    opportunityId: string,
+  ) {
     /*
-     * 1. Build the trusted decision context.
+     * 1. Build trusted decision context.
      */
     const context =
       await decisionContextService.build(
@@ -34,7 +56,7 @@ export const decisionService = {
       );
 
     /*
-     * 2. Generate + validate the recommendation.
+     * 2. Select and validate recommendation.
      */
     const output =
       decisionEngineService.decide(
@@ -42,42 +64,112 @@ export const decisionService = {
       );
 
     /*
-     * 3. Persist both input and output.
+     * 3. Persist decision safely.
      *
-     * This creates an audit trail:
-     * "What did the engine know when it made
-     * this recommendation?"
+     * The repository uses a PostgreSQL
+     * advisory lock and checks for an
+     * existing pending decision.
+     *
+     * The database partial unique index
+     * provides additional protection.
      */
-    const decision =
-      await decisionRepository.create({
-        opportunityId,
+    let result;
 
-        action: output.action,
-        priority: output.priority,
+    try {
+      result =
+        await decisionRepository
+          .createIfNoPendingDecision({
+            opportunityId,
 
-        summary: output.summary,
-        reasoning: output.reasoning,
-        confidence: output.confidence,
+            action:
+              output.action,
 
-        inputSnapshot:
-          toJsonValue(context),
+            priority:
+              output.priority,
 
-        proposedAction:
-          toJsonValue(output.proposedAction),
+            summary:
+              output.summary,
 
-        modelVersion:
-          DECISION_MODEL_VERSION,
+            reasoning:
+              output.reasoning,
 
-        promptVersion:
-          DECISION_PROMPT_VERSION,
+            confidence:
+              output.confidence,
 
-        policyVersion:
-          DECISION_POLICY_VERSION,
-      });
+            inputSnapshot:
+              toJsonValue(context),
 
+            proposedAction:
+              toJsonValue(
+                output.proposedAction,
+              ),
+
+            modelVersion:
+              DECISION_MODEL_VERSION,
+
+            promptVersion:
+              DECISION_PROMPT_VERSION,
+
+            policyVersion:
+              DECISION_POLICY_VERSION,
+          });
+    } catch (error) {
+      /*
+       * Step 7J.6:
+       *
+       * P2002 means a unique constraint
+       * was violated.
+       *
+       * Only translate it into a duplicate
+       * decision response when we can
+       * confirm an existing pending decision.
+       */
+      if (
+        error instanceof
+          Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const existingDecision =
+          await decisionRepository
+            .findPendingByOpportunityId(
+              opportunityId,
+            );
+
+        if (existingDecision) {
+          throw new PendingDecisionExistsError(
+            existingDecision.id,
+          );
+        }
+      }
+
+      /*
+       * Preserve unexpected errors.
+       */
+      throw error;
+    }
+
+    /*
+     * 4. Handle duplicate detected by
+     * the advisory-lock transaction.
+     */
+    if (
+      result.kind ===
+      "PENDING_EXISTS"
+    ) {
+      throw new PendingDecisionExistsError(
+        result.decision.id,
+      );
+    }
+
+    /*
+     * 5. Return the generated decision.
+     */
     return {
-      decision,
-      evidence: output.evidence,
+      decision:
+        result.decision,
+
+      evidence:
+        output.evidence,
     };
   },
 };
@@ -85,11 +177,6 @@ export const decisionService = {
 function toJsonValue(
   value: unknown,
 ): Prisma.InputJsonValue {
-  /*
-   * Produces a JSON-safe detached snapshot.
-   * Dates become ISO strings and undefined values
-   * are omitted by JSON serialization.
-   */
   return JSON.parse(
     JSON.stringify(value),
   ) as Prisma.InputJsonValue;

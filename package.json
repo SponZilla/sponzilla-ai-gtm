@@ -12,6 +12,7 @@
     "build": "npm run build --workspace=@sponzilla/contracts && tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "test:decision-policy": "tsx --test src/modules/decision/decision-policy.service.test.ts",
     "db:migrate": "prisma migrate deploy --config prisma7.config.ts",
     "db:generate": "prisma generate --config prisma7.config.ts",
     "smoke:gymshark": "tsx scripts/smoke-gymshark-ingest.ts"

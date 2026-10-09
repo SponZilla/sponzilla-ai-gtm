@@ -2,6 +2,10 @@ import {
   decisionRepository,
 } from "./decision.repository.js";
 
+import type {
+  ResolveDecisionApprovalInput,
+} from "./decision-approval.types.js";
+
 export class DecisionNotFoundError extends Error {
   constructor() {
     super("Decision not found");
@@ -28,47 +32,30 @@ export const decisionApprovalService = {
   async resolve(
     decisionId: string,
     outcome: ApprovalOutcome,
+    input: ResolveDecisionApprovalInput,
   ) {
-    const existing =
-      await decisionRepository.findById(
+    const result =
+      await decisionRepository.resolveWithApproval(
         decisionId,
+        outcome,
+        {
+          actorId: input.actorId,
+          actorName: input.actorName,
+          comment: input.comment,
+        },
       );
 
-    if (!existing) {
+    if (result.kind === "NOT_FOUND") {
       throw new DecisionNotFoundError();
     }
 
     if (
-      existing.status !==
-      "AWAITING_APPROVAL"
+      result.kind ===
+      "ALREADY_RESOLVED"
     ) {
       throw new DecisionAlreadyResolvedError();
     }
 
-    const result =
-      await decisionRepository
-        .updateStatusIfAwaitingApproval(
-          decisionId,
-          outcome,
-        );
-
-    /*
-     * Another request may have resolved the
-     * decision between our read and update.
-     */
-    if (result.count !== 1) {
-      throw new DecisionAlreadyResolvedError();
-    }
-
-    const updated =
-      await decisionRepository.findById(
-        decisionId,
-      );
-
-    if (!updated) {
-      throw new DecisionNotFoundError();
-    }
-
-    return updated;
+    return result.decision;
   },
 };

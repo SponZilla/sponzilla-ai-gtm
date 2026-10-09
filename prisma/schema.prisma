@@ -8,32 +8,48 @@ datasource db {
 }
 
 model Company {
-  id            String        @id @default(uuid())
-  name          String
-  website       String?
-  industry      String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id       String  @id @default(uuid())
+  name     String
+  website  String?
+  industry String?
+
   opportunities Opportunity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([name])
 }
 
 model Opportunity {
-  id                 String                         @id @default(uuid())
-  companyId          String
-  title              String
-  source             OpportunitySource
-  stage              OpportunityStage               @default(NEW)
-  estimatedBudget    Decimal?                       @db.Decimal(12, 2)
-  objective          String?
-  lastInteractionAt  DateTime?
-  createdAt          DateTime                       @default(now())
-  updatedAt          DateTime                       @updatedAt
-  decisions          GTMDecision[]
+  id        String @id @default(uuid())
+  companyId String
+
+  title  String
+  source OpportunitySource
+  stage  OpportunityStage  @default(NEW)
+
+  estimatedBudget Decimal? @db.Decimal(12, 2)
+  objective       String?
+
+  lastInteractionAt DateTime?
+
+  /// Stable external Market Intelligence opportunity ID.
+  externalId String? @unique
+
+  /// Full validated OpportunityV1 payload used by Decision Context.
+  intelligenceSnapshot Json?
+
+  /// Provenance of the opportunity, for example MARKET_INTELLIGENCE.
+  origin String?
+
+  company            Company                        @relation(fields: [companyId], references: [id], onDelete: Restrict)
   interactions       Interaction[]
+  decisions          GTMDecision[]
   marketIntelligence MarketIntelligenceOpportunity?
-  company            Company                        @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([companyId])
   @@index([stage])
@@ -41,123 +57,160 @@ model Opportunity {
 }
 
 model MarketIntelligenceOpportunity {
-  id                    String      @id @default(uuid())
-  externalOpportunityId String      @unique
+  id                    String @id @default(uuid())
+  externalOpportunityId String @unique
   contractVersion       String
-  opportunityId         String      @unique
-  location              String
-  audience              String[]
-  marketingNeed         String
-  interpretation        String
-  inferenceConfidence   Decimal     @db.Decimal(5, 4)
-  recommendation        String
-  nextActionHint        String
-  signals               Json
-  evidence              Json
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  opportunity           Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  opportunityId         String @unique
+
+  location String
+
+  audience       String[]
+  marketingNeed  String
+  interpretation String
+
+  inferenceConfidence Decimal @db.Decimal(5, 4)
+
+  recommendation String
+  nextActionHint String
+
+  signals  Json
+  evidence Json
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([createdAt])
 }
 
 model Interaction {
-  id            String          @id @default(uuid())
+  id            String @id @default(uuid())
   opportunityId String
-  type          InteractionType
-  summary       String
-  occurredAt    DateTime
-  createdAt     DateTime        @default(now())
-  opportunity   Opportunity     @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  type    InteractionType
+  summary String
+
+  occurredAt DateTime
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@index([opportunityId])
   @@index([opportunityId, occurredAt])
 }
 
 model GTMDecision {
-  id             String           @id @default(uuid())
-  opportunityId  String
-  action         GTMActionType
-  priority       DecisionPriority
-  status         DecisionStatus   @default(AWAITING_APPROVAL)
-  summary        String
-  reasoning      String[]
-  confidence     Decimal          @db.Decimal(5, 4)
+  id            String @id @default(uuid())
+  opportunityId String
+
+  action   GTMActionType
+  priority DecisionPriority
+  status   DecisionStatus   @default(AWAITING_APPROVAL)
+
+  summary    String
+  reasoning  String[]
+  confidence Decimal  @db.Decimal(5, 4)
+
   inputSnapshot  Json
   proposedAction Json
-  modelVersion   String
-  promptVersion  String
-  policyVersion  String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  approvals      Approval[]
-  evidence       Evidence[]
-  executions     Execution[]
-  opportunity    Opportunity      @relation(fields: [opportunityId], references: [id])
-  outcomes       Outcome[]
+
+  modelVersion  String
+  promptVersion String
+  policyVersion String
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+
+  evidence   Evidence[]
+  approvals  Approval[]
+  executions Execution[]
+  outcomes   Outcome[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([opportunityId, createdAt])
   @@index([status])
 }
 
 model Evidence {
-  id         String             @id @default(uuid())
+  id         String @id @default(uuid())
   decisionId String
+
   sourceType EvidenceSourceType
   sourceId   String?
-  claim      String
-  value      String?
-  createdAt  DateTime           @default(now())
-  decision   GTMDecision        @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  claim String
+  value String?
+
+  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@index([decisionId])
   @@index([sourceType, sourceId])
 }
 
 model Approval {
-  id             String         @id @default(uuid())
-  decisionId     String
-  status         ApprovalStatus
-  actorId        String
-  actorName      String?
-  comment        String?
+  id         String @id @default(uuid())
+  decisionId String
+
+  status ApprovalStatus
+
+  actorId   String
+  actorName String?
+  comment   String?
+
   actionSnapshot Json
-  createdAt      DateTime       @default(now())
-  decision       GTMDecision    @relation(fields: [decisionId], references: [id])
-  executions     Execution[]
+
+  decision   GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  executions Execution[]
+
+  createdAt DateTime @default(now())
 
   @@index([decisionId, createdAt])
   @@index([actorId])
 }
 
 model Execution {
-  id             String          @id @default(uuid())
-  decisionId     String
-  approvalId     String
-  action         GTMActionType
-  status         ExecutionStatus @default(PENDING)
+  id         String @id @default(uuid())
+  decisionId String
+  approvalId String
+
+  action GTMActionType
+  status ExecutionStatus @default(PENDING)
+
   actionSnapshot Json
   result         Json?
-  errorMessage   String?
-  createdAt      DateTime        @default(now())
-  executedAt     DateTime?
-  approval       Approval        @relation(fields: [approvalId], references: [id])
-  decision       GTMDecision     @relation(fields: [decisionId], references: [id])
 
-  @@index([decisionId, createdAt])
+  errorMessage String?
+
+  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  approval Approval    @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+
+  createdAt  DateTime  @default(now())
+  executedAt DateTime?
+
+  @@unique([decisionId])
   @@index([approvalId])
   @@index([status])
 }
 
 model Outcome {
-  id         String      @id @default(uuid())
+  id         String @id @default(uuid())
   decisionId String
-  type       OutcomeType
-  value      Decimal?    @db.Decimal(14, 2)
-  metadata   Json?
+
+  type OutcomeType
+
+  value    Decimal? @db.Decimal(14, 2)
+  metadata Json?
+
   occurredAt DateTime
-  createdAt  DateTime    @default(now())
-  decision   GTMDecision @relation(fields: [decisionId], references: [id])
+
+  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
 
   @@index([decisionId, occurredAt])
   @@index([type])
@@ -247,184 +300,4 @@ enum OutcomeType {
   PROPOSAL_REJECTED
   OPPORTUNITY_WON
   OPPORTUNITY_LOST
-}
-
-model Company {
-  id       String  @id @default(uuid())
-  name     String
-  website  String?
-  industry String?
-
-  opportunities Opportunity[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-}
-
-model Opportunity {
-  id        String @id @default(uuid())
-  companyId String
-
-  title  String
-  source OpportunitySource
-  stage  OpportunityStage  @default(NEW)
-
-  estimatedBudget Decimal? @db.Decimal(12, 2)
-  objective       String?
-
-  lastInteractionAt DateTime?
-
-  /** MI OpportunityV1.id — stable external reference across ingest upserts. */
-  externalId String? @unique
-
-  /** Full validated OpportunityV1 JSON for Decision Context (contract ≠ CRM columns). */
-  intelligenceSnapshot Json?
-
-  /** Provenance from OpportunityV1.origin (e.g. MARKET_INTELLIGENCE). */
-  origin String?
-
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  interactions Interaction[]
-  decisions    GTMDecision[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyId])
-  @@index([stage])
-  @@index([companyId, stage])
-}
-
-model Interaction {
-  id            String @id @default(uuid())
-  opportunityId String
-
-  type    InteractionType
-  summary String
-
-  occurredAt DateTime
-
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([opportunityId])
-  @@index([opportunityId, occurredAt])
-}
-
-model GTMDecision {
-  id            String @id @default(uuid())
-  opportunityId String
-
-  action   GTMActionType
-  priority DecisionPriority
-  status   DecisionStatus   @default(AWAITING_APPROVAL)
-
-  summary    String
-  reasoning  String[]
-  confidence Decimal  @db.Decimal(5, 4)
-
-  inputSnapshot  Json
-  proposedAction Json
-
-  modelVersion  String
-  promptVersion String
-  policyVersion String
-
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
-  evidence    Evidence[]
-  approvals   Approval[]
-  executions  Execution[]
-  outcomes    Outcome[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([opportunityId, createdAt])
-  @@index([status])
-}
-
-model Evidence {
-  id         String @id @default(uuid())
-  decisionId String
-
-  sourceType EvidenceSourceType
-  sourceId   String?
-
-  claim String
-  value String?
-
-  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([decisionId])
-  @@index([sourceType, sourceId])
-}
-
-model Approval {
-  id         String @id @default(uuid())
-  decisionId String
-
-  status ApprovalStatus
-
-  actorId   String
-  actorName String?
-
-  comment String?
-
-  actionSnapshot Json
-
-  decision   GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
-  executions Execution[]
-
-  createdAt DateTime @default(now())
-
-  @@index([decisionId, createdAt])
-  @@index([actorId])
-}
-
-model Execution {
-  id         String @id @default(uuid())
-  decisionId String
-  approvalId String
-
-  action GTMActionType
-  status ExecutionStatus @default(PENDING)
-
-  actionSnapshot Json
-  result         Json?
-
-  errorMessage String?
-
-  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
-  approval Approval    @relation(fields: [approvalId], references: [id], onDelete: Restrict)
-
-  createdAt  DateTime  @default(now())
-  executedAt DateTime?
-
-  @@index([decisionId, createdAt])
-  @@index([approvalId])
-  @@index([status])
-}
-
-model Outcome {
-  id         String @id @default(uuid())
-  decisionId String
-
-  type OutcomeType
-
-  value    Decimal? @db.Decimal(14, 2)
-  metadata Json?
-
-  occurredAt DateTime
-
-  decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
-
-  createdAt DateTime @default(now())
-
-  @@index([decisionId, occurredAt])
-  @@index([type])
 }

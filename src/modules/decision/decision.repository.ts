@@ -4,7 +4,9 @@ import {
   type GTMActionType,
 } from "../../generated/prisma/client.js";
 
-import { prisma } from "../../lib/prisma.js";
+import {
+  prisma,
+} from "../../lib/prisma.js";
 
 interface CreateDecisionInput {
   opportunityId: string;
@@ -34,48 +36,137 @@ type ApprovalOutcome =
   | "APPROVED"
   | "REJECTED";
 
+function buildDecisionData(
+  input: CreateDecisionInput,
+) {
+  return {
+    opportunityId:
+      input.opportunityId,
+
+    action:
+      input.action,
+
+    priority:
+      input.priority,
+
+    summary:
+      input.summary,
+
+    reasoning:
+      input.reasoning,
+
+    confidence:
+      new Prisma.Decimal(
+        input.confidence,
+      ),
+
+    inputSnapshot:
+      input.inputSnapshot,
+
+    proposedAction:
+      input.proposedAction,
+
+    modelVersion:
+      input.modelVersion,
+
+    promptVersion:
+      input.promptVersion,
+
+    policyVersion:
+      input.policyVersion,
+  };
+}
+
 export const decisionRepository = {
   /**
-   * Create a new GTM decision.
+   * Basic decision creation.
+   *
+   * Retained for compatibility.
+   *
+   * Normal GTM generation should use
+   * createIfNoPendingDecision().
    */
-  create(input: CreateDecisionInput) {
+  create(
+    input: CreateDecisionInput,
+  ) {
     return prisma.gTMDecision.create({
-      data: {
-        opportunityId:
-          input.opportunityId,
-
-        action: input.action,
-        priority: input.priority,
-
-        summary: input.summary,
-        reasoning: input.reasoning,
-
-        confidence: new Prisma.Decimal(
-          input.confidence,
-        ),
-
-        inputSnapshot:
-          input.inputSnapshot,
-
-        proposedAction:
-          input.proposedAction,
-
-        modelVersion:
-          input.modelVersion,
-
-        promptVersion:
-          input.promptVersion,
-
-        policyVersion:
-          input.policyVersion,
-      },
+      data:
+        buildDecisionData(input),
     });
   },
 
   /**
-   * Find a decision by ID.
+   * Concurrency-safe decision creation.
+   *
+   * The PostgreSQL transaction-level advisory
+   * lock serializes decision generation for
+   * the same opportunity.
+   *
+   * This prevents two simultaneous requests
+   * from both creating AWAITING_APPROVAL
+   * decisions.
    */
-  findById(id: string) {
+  async createIfNoPendingDecision(
+    input: CreateDecisionInput,
+  ) {
+    return prisma.$transaction(
+      async (tx) => {
+        /*
+         * Lock is scoped to this transaction.
+         *
+         * Requests for different opportunities
+         * can still proceed independently.
+         */
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(
+            hashtext(${input.opportunityId})
+          )
+        `;
+
+        const existingDecision =
+          await tx.gTMDecision.findFirst({
+            where: {
+              opportunityId:
+                input.opportunityId,
+
+              status:
+                "AWAITING_APPROVAL",
+            },
+
+            orderBy: {
+              createdAt: "desc",
+            },
+          });
+
+        if (existingDecision) {
+          return {
+            kind:
+              "PENDING_EXISTS" as const,
+
+            decision:
+              existingDecision,
+          };
+        }
+
+        const decision =
+          await tx.gTMDecision.create({
+            data:
+              buildDecisionData(input),
+          });
+
+        return {
+          kind:
+            "CREATED" as const,
+
+          decision,
+        };
+      },
+    );
+  },
+
+  findById(
+    id: string,
+  ) {
     return prisma.gTMDecision.findUnique({
       where: {
         id,
@@ -83,13 +174,6 @@ export const decisionRepository = {
     });
   },
 
-  /**
-   * Update the decision only when it is still
-   * waiting for human approval.
-   *
-   * Kept for compatibility with the previous
-   * approval implementation.
-   */
   updateStatusIfAwaitingApproval(
     id: string,
     status: ApprovalOutcome,
@@ -97,7 +181,9 @@ export const decisionRepository = {
     return prisma.gTMDecision.updateMany({
       where: {
         id,
-        status: "AWAITING_APPROVAL",
+
+        status:
+          "AWAITING_APPROVAL",
       },
 
       data: {
@@ -106,10 +192,6 @@ export const decisionRepository = {
     });
   },
 
-  /**
-   * Atomically resolve a decision and create
-   * the corresponding Approval audit record.
-   */
   async resolveWithApproval(
     decisionId: string,
     outcome: ApprovalOutcome,
@@ -117,11 +199,6 @@ export const decisionRepository = {
   ) {
     return prisma.$transaction(
       async (tx) => {
-        /*
-         * Read the decision first because we need
-         * proposedAction for the immutable approval
-         * snapshot.
-         */
         const decision =
           await tx.gTMDecision.findUnique({
             where: {
@@ -131,23 +208,16 @@ export const decisionRepository = {
 
         if (!decision) {
           return {
-            kind: "NOT_FOUND" as const,
+            kind:
+              "NOT_FOUND" as const,
           };
         }
 
-        /*
-         * updateMany gives us a safe conditional
-         * update:
-         *
-         * AWAITING_APPROVAL -> APPROVED/REJECTED
-         *
-         * If another request already resolved it,
-         * count will be 0.
-         */
         const update =
           await tx.gTMDecision.updateMany({
             where: {
               id: decisionId,
+
               status:
                 "AWAITING_APPROVAL",
             },
@@ -164,18 +234,14 @@ export const decisionRepository = {
           };
         }
 
-        /*
-         * Record who approved/rejected the
-         * decision and exactly what action they
-         * reviewed.
-         */
         const approval =
           await tx.approval.create({
             data: {
               decisionId:
                 decision.id,
 
-              status: outcome,
+              status:
+                outcome,
 
               actorId:
                 actor.actorId,
@@ -188,25 +254,24 @@ export const decisionRepository = {
                 actor.comment ??
                 null,
 
-             actionSnapshot:
-  decision.proposedAction as Prisma.InputJsonValue,
+              actionSnapshot:
+                decision
+                  .proposedAction as Prisma.InputJsonValue,
             },
-        });
+          });
 
-        /*
-         * Return the final decision state.
-         */
         const updatedDecision =
-          await tx.gTMDecision.findUniqueOrThrow(
-            {
+          await tx.gTMDecision
+            .findUniqueOrThrow({
               where: {
-                id: decisionId,
+                id:
+                  decisionId,
               },
-            },
-          );
+            });
 
         return {
-          kind: "RESOLVED" as const,
+          kind:
+            "RESOLVED" as const,
 
           decision:
             updatedDecision,
@@ -216,4 +281,55 @@ export const decisionRepository = {
       },
     );
   },
+
+  markExecutedIfApproved(
+    decisionId: string,
+  ) {
+    return prisma.gTMDecision.updateMany({
+      where: {
+        id:
+          decisionId,
+
+        status:
+          "APPROVED",
+      },
+
+      data: {
+        status:
+          "EXECUTED",
+      },
+    });
+  },
+
+  markFailedIfApproved(
+    decisionId: string,
+  ) {
+    return prisma.gTMDecision.updateMany({
+      where: {
+        id:
+          decisionId,
+
+        status:
+          "APPROVED",
+      },
+
+      data: {
+        status:
+          "FAILED",
+      },
+    });
+  },
+  findPendingByOpportunityId(
+  opportunityId: string,
+) {
+  return prisma.gTMDecision.findFirst({
+    where: {
+      opportunityId,
+      status: "AWAITING_APPROVAL",
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+},
 };

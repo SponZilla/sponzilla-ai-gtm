@@ -10,7 +10,13 @@ import {
   approveDecision,
   generateDecision,
   rejectDecision,
+  executeDecision,
 } from "./decision.controller.js";
+
+import {
+  listDecisionOutcomes,
+  recordDecisionOutcome,
+} from "./decision-outcome.controller.js";
 
 export const decisionRouter = Router();
 
@@ -32,4 +38,23 @@ decisionRouter.post(
 decisionRouter.post(
   "/decisions/:id/reject",
   asyncHandler(rejectDecision),
+);
+
+decisionRouter.post(
+  "/decisions/:id/execute",
+  asyncHandler(executeDecision),
+);
+
+decisionRouter.post(
+  "/decisions/:id/outcomes",
+  asyncHandler(
+    recordDecisionOutcome,
+  ),
+);
+
+decisionRouter.get(
+  "/decisions/:id/outcomes",
+  asyncHandler(
+    listDecisionOutcomes,
+  ),
 );

@@ -6,6 +6,10 @@ import type {
   OpportunityStage,
 } from "../../generated/prisma/client.js";
 
+import type {
+  GTMDecisionHistoryContext,
+} from "./decision-history.types.js";
+
 export interface GTMInteractionContext {
   id: string;
   type: InteractionType;
@@ -70,6 +74,7 @@ export interface GTMDecisionContext {
   company: GTMCompanyContext;
   opportunity: GTMOpportunityContext;
   interactions: GTMInteractionContext[];
+  history: GTMDecisionHistoryContext;
 
   /** Canonical MI handoff payload when ingested; null for manual CRM-only deals. */
   intelligence: OpportunityV1 | null;

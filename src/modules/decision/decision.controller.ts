@@ -1,3 +1,4 @@
+
 import type {
   Request,
   Response,
@@ -7,6 +8,7 @@ import { z } from "zod";
 
 import {
   decisionService,
+  PendingDecisionExistsError,
 } from "./decision.service.js";
 
 import {
@@ -14,6 +16,17 @@ import {
   DecisionNotFoundError,
   decisionApprovalService,
 } from "./decision-approval.service.js";
+
+import {
+  decisionExecutionOrchestrator,
+} from "./decision-execution.orchestrator.js";
+
+import {
+  ApprovalNotFoundError,
+  DecisionAlreadyExecutedError,
+  DecisionNotApprovedError,
+  ExecutionDecisionNotFoundError,
+} from "./decision-execution.service.js";
 
 import {
   DecisionOpportunityNotFoundError,
@@ -25,6 +38,12 @@ const opportunityParamsSchema = z.object({
 
 const decisionParamsSchema = z.object({
   id: z.string().uuid(),
+});
+
+const decisionApprovalBodySchema = z.object({
+  actorId: z.string().min(1),
+  actorName: z.string().min(1).optional(),
+  comment: z.string().min(1).optional(),
 });
 
 export async function generateDecision(
@@ -61,6 +80,28 @@ export async function generateDecision(
       });
     }
 
+    /*
+     * Step 7J.3:
+     *
+     * The repository has detected an existing
+     * AWAITING_APPROVAL decision.
+     *
+     * Return HTTP 409 instead of creating
+     * another pending decision.
+     */
+    if (
+      error instanceof
+      PendingDecisionExistsError
+    ) {
+      return res.status(409).json({
+        error: "PENDING_DECISION_EXISTS",
+
+        message: error.message,
+
+        decisionId: error.decisionId,
+      });
+    }
+
     throw error;
   }
 }
@@ -92,22 +133,36 @@ async function resolveDecision(
   res: Response,
   outcome: "APPROVED" | "REJECTED",
 ) {
-  const parsed =
+  const parsedParams =
     decisionParamsSchema.safeParse(
       req.params,
     );
 
-  if (!parsed.success) {
+  if (!parsedParams.success) {
     return res.status(400).json({
       error: "INVALID_DECISION_ID",
+    });
+  }
+
+  const parsedBody =
+    decisionApprovalBodySchema.safeParse(
+      req.body,
+    );
+
+  if (!parsedBody.success) {
+    return res.status(400).json({
+      error: "INVALID_APPROVAL_INPUT",
+      details:
+        parsedBody.error.flatten(),
     });
   }
 
   try {
     const decision =
       await decisionApprovalService.resolve(
-        parsed.data.id,
+        parsedParams.data.id,
         outcome,
+        parsedBody.data,
       );
 
     return res.status(200).json({
@@ -128,7 +183,74 @@ async function resolveDecision(
       DecisionAlreadyResolvedError
     ) {
       return res.status(409).json({
-        error: "DECISION_ALREADY_RESOLVED",
+        error:
+          "DECISION_ALREADY_RESOLVED",
+      });
+    }
+
+    throw error;
+  }
+}
+
+export async function executeDecision(
+  req: Request,
+  res: Response,
+) {
+  const parsed =
+    decisionParamsSchema.safeParse(
+      req.params,
+    );
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: "INVALID_DECISION_ID",
+    });
+  }
+
+  try {
+    const execution =
+      await decisionExecutionOrchestrator.execute(
+        parsed.data.id,
+      );
+
+    return res.status(200).json({
+      data: execution,
+    });
+  } catch (error) {
+    if (
+      error instanceof
+      ExecutionDecisionNotFoundError
+    ) {
+      return res.status(404).json({
+        error: "DECISION_NOT_FOUND",
+      });
+    }
+
+    if (
+      error instanceof
+      DecisionNotApprovedError
+    ) {
+      return res.status(409).json({
+        error: "DECISION_NOT_APPROVED",
+      });
+    }
+
+    if (
+      error instanceof
+      ApprovalNotFoundError
+    ) {
+      return res.status(409).json({
+        error: "APPROVAL_NOT_FOUND",
+      });
+    }
+
+    if (
+      error instanceof
+      DecisionAlreadyExecutedError
+    ) {
+      return res.status(409).json({
+        error:
+          "DECISION_ALREADY_EXECUTED",
       });
     }
 

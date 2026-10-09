@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/*
+ * Evidence supporting a GTM decision.
+ *
+ * Every decision must be explainable using
+ * information already available to the system.
+ */
 export const decisionEvidenceSchema = z
   .object({
     source: z.enum([
@@ -24,6 +30,13 @@ export const decisionEvidenceSchema = z
   })
   .strict();
 
+/*
+ * Safe representation of what should happen
+ * after the decision is approved.
+ *
+ * These are execution categories, not the
+ * actual GTM decision types.
+ */
 export const proposedActionSchema = z
   .object({
     type: z.enum([
@@ -31,6 +44,11 @@ export const proposedActionSchema = z
       "OUTREACH",
       "FOLLOW_UP",
       "PREPARE_PROPOSAL",
+      "PREPARE_PRICING",
+      "SCHEDULE_MEETING",
+      "ESCALATE",
+      "WAIT",
+      "CLOSE",
       "REQUEST_INFORMATION",
     ]),
 
@@ -40,10 +58,18 @@ export const proposedActionSchema = z
       .min(1)
       .max(1000),
 
+    /*
+     * Human approval remains mandatory.
+     */
     requiresApproval: z.literal(true),
   })
   .strict();
 
+/*
+ * Canonical deterministic GTM decision output.
+ *
+ * Keep this aligned with Prisma GTMActionType.
+ */
 export const gtmDecisionOutputSchema = z
   .object({
     action: z.enum([
@@ -52,6 +78,12 @@ export const gtmDecisionOutputSchema = z
       "SEND_INTRODUCTION",
       "SEND_CASE_STUDY",
       "SEND_CAMPAIGN_PROPOSAL",
+      "SCHEDULE_DISCOVERY_CALL",
+      "FOLLOW_UP",
+      "PREPARE_PRICING",
+      "ESCALATE_TO_SALES",
+      "WAIT",
+      "CLOSE_OPPORTUNITY",
     ]),
 
     priority: z.enum([
@@ -68,7 +100,11 @@ export const gtmDecisionOutputSchema = z
 
     reasoning: z
       .array(
-        z.string().trim().min(1).max(500),
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(500),
       )
       .min(1)
       .max(5),
@@ -83,10 +119,12 @@ export const gtmDecisionOutputSchema = z
       .min(0)
       .max(1),
 
-    proposedAction: proposedActionSchema,
+    proposedAction:
+      proposedActionSchema,
   })
   .strict();
 
-export type GTMDecisionOutput = z.infer<
-  typeof gtmDecisionOutputSchema
->;
+export type GTMDecisionOutput =
+  z.infer<
+    typeof gtmDecisionOutputSchema
+  >;
