@@ -8,6 +8,9 @@ import { opportunityRouter } from "./modules/opportunity/opportunity.routes.js";
 import { interactionRouter } from "./modules/interaction/interaction.routes.js";
 import { decisionRouter } from "./modules/decision/decision.routes.js";
 import { marketIntelligenceRouter } from "./modules/market-intelligence/market-intelligence.routes.js";
+import {
+  decisionExecutionMonitoringRouter,
+} from "./modules/decision/decision-execution-monitoring.routes.js";
 
 export const app = express();
 
@@ -54,6 +57,11 @@ app.get("/health", (_req, res) => {
     status: "ok",
   });
 });
+
+app.use(
+  "/api/v1/admin",
+  decisionExecutionMonitoringRouter,
+);
 
 app.use(notFoundHandler);
 

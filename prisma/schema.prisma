@@ -186,6 +186,19 @@ model Execution {
 
   errorMessage String?
 
+  // Recovery and reconciliation metadata.
+  // Null means the execution has not yet
+  // been claimed for dispatch.
+  startedAt DateTime?
+
+  // Updated by the execution worker while
+  // actively processing an action.
+  lastHeartbeatAt DateTime?
+
+  // Set when an operator or recovery process
+  // last inspected the execution.
+  lastReconciledAt DateTime?
+
   decision GTMDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
   approval Approval    @relation(fields: [approvalId], references: [id], onDelete: Restrict)
 
@@ -195,6 +208,7 @@ model Execution {
   @@unique([decisionId])
   @@index([approvalId])
   @@index([status])
+  @@index([status, startedAt])
 }
 
 model Outcome {
@@ -300,4 +314,36 @@ enum OutcomeType {
   PROPOSAL_REJECTED
   OPPORTUNITY_WON
   OPPORTUNITY_LOST
+}
+
+
+model AdminAuditLog {
+  id String @id @default(uuid())
+
+  // Administrative operation performed
+  action String
+
+  // Type and ID of the affected resource
+  resourceType String
+  resourceId String?
+
+  // Identifies the internal credential or service
+  actorType String @default("INTERNAL_SERVICE")
+  actorId String?
+
+  // Result of the operation
+  outcome String
+
+  // Request correlation
+  requestId String?
+
+  // Optional structured, non-sensitive details
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
 }
