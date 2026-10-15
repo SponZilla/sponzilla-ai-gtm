@@ -4,6 +4,14 @@ import {
 } from "./decision-output.schema.js";
 
 import {
+  validateConfidenceSignal,
+} from "./decision-confidence.validator.js";
+
+import {
+  validateDecisionEvidence,
+} from "./decision-evidence.validator.js";
+
+import {
   decisionPolicyService,
 } from "./decision-policy.service.js";
 
@@ -17,22 +25,30 @@ import type {
 
 export const decisionEngineService = {
   decide(
-    context: GTMDecisionContext,
-  ): GTMDecisionOutput {
-    const action =
-      decisionPolicyService.selectAction(
-        context,
-      );
+  context: GTMDecisionContext,
+): GTMDecisionOutput {
+  const action =
+    decisionPolicyService.selectAction(
+      context,
+    );
 
-    const decision =
-      buildDecision(
-        context,
-        action,
-      );
+  const decision =
+    buildDecision(
+      context,
+      action,
+    );
 
-    return gtmDecisionOutputSchema.parse(
+  const validatedDecision =
+    gtmDecisionOutputSchema.parse(
       decision,
     );
+
+  validateDecisionEvidence(
+    context,
+    validatedDecision,
+  );
+
+  return validatedDecision;
   },
 };
 
@@ -583,6 +599,9 @@ function adjustConfidenceFromHistory(
     typeof analyzeHistory
   >,
 ): number {
+  validateConfidenceSignal(
+  baseConfidence,
+);
   if (
     history.evaluatedOutcomes === 0
   ) {
@@ -618,6 +637,11 @@ function getStrongestEvidence(
     ]
   >["evidence"],
 ) {
+  for (const item of evidence) {
+  validateConfidenceSignal(
+    item.confidence,
+  );
+}
   return evidence.reduce<
     | (typeof evidence)[number]
     | undefined
@@ -626,16 +650,20 @@ function getStrongestEvidence(
       strongest,
       current,
     ) => {
-      if (
-        !strongest ||
-        current.confidence >
-          strongest.confidence
-      ) {
-        return current;
-      }
+  validateConfidenceSignal(
+    current.confidence,
+  );
 
-      return strongest;
-    },
+  if (
+    !strongest ||
+    current.confidence >
+      strongest.confidence
+  ) {
+    return current;
+  }
+
+  return strongest;
+},
     undefined,
   );
 }
@@ -734,6 +762,15 @@ function calculateDecisionConfidence(
   inferenceConfidence: number,
   evidenceConfidence?: number,
 ): number {
+  validateConfidenceSignal(
+  inferenceConfidence,
+);
+
+if (evidenceConfidence !== undefined) {
+  validateConfidenceSignal(
+    evidenceConfidence,
+  );
+}
   if (
     evidenceConfidence === undefined
   ) {

@@ -15,7 +15,60 @@ interface CreateExecutionInput {
   decisionId: string;
   approvalId: string;
   action: GTMActionType;
-  actionSnapshot: Prisma.InputJsonValue;
+  actionSnapshot: Prisma.JsonObject;
+}
+
+function isJsonObject(
+  value: Prisma.JsonValue,
+): value is Prisma.JsonObject {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  );
+}
+
+function jsonEquals(
+  left: Prisma.JsonValue,
+  right: Prisma.JsonValue,
+): boolean {
+  if (left === right) return true;
+
+  if (left === null || right === null) {
+    return false;
+  }
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) {
+      return false;
+    }
+
+    return (
+      left.length === right.length &&
+      left.every((value, index) =>
+        jsonEquals(value, right[index]!)
+      )
+    );
+  }
+
+  if (
+    typeof left === "object" &&
+    typeof right === "object"
+  ) {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+
+    return (
+      leftKeys.length === rightKeys.length &&
+      leftKeys.every(
+        (key) =>
+          Object.prototype.hasOwnProperty.call(right, key) &&
+          jsonEquals(left[key]!, right[key]!)
+      )
+    );
+  }
+
+  return false;
 }
 
 export const decisionExecutionRepository = {
@@ -88,6 +141,90 @@ export const decisionExecutionRepository = {
             };
           }
 
+          /*
+ * Verify the decision and approval
+ * within the same database transaction.
+ */
+const decision =
+  await tx.gTMDecision.findUnique({
+    where: {
+      id: input.decisionId,
+    },
+    select: {
+      id: true,
+      status: true,
+      action: true,
+      proposedAction: true,
+    },
+  });
+
+if (!decision || decision.status !== "APPROVED") {
+  return {
+    kind: "INVALID_DECISION_STATE" as const,
+  };
+}
+
+if (decision.action !== input.action) {
+  return {
+    kind: "ACTION_MISMATCH" as const,
+  };
+}
+
+const approval =
+  await tx.approval.findFirst({
+    where: {
+      id: input.approvalId,
+      decisionId: input.decisionId,
+      status: "APPROVED",
+    },
+    select: {
+  id: true,
+  actionSnapshot: true,
+},
+  });
+
+if (!approval) {
+  return {
+    kind: "INVALID_APPROVAL" as const,
+  };
+}
+
+/*
+ * Ensure the approved payload has not
+ * diverged from the decision proposal.
+ */
+if (
+  !isJsonObject(decision.proposedAction) ||
+  !isJsonObject(approval.actionSnapshot) ||
+  !jsonEquals(
+    decision.proposedAction,
+    approval.actionSnapshot,
+  )
+) {
+  return {
+    kind: "INVALID_ACTION_SNAPSHOT" as const,
+  };
+}
+
+/*
+ * Validate caller-provided JSON before comparison.
+ *
+ * JSON serialization normalizes Prisma input JSON
+ * into the same representation used for comparison.
+ */
+if (
+  !jsonEquals(
+    approval.actionSnapshot,
+    JSON.parse(
+      JSON.stringify(input.actionSnapshot),
+    ) as Prisma.JsonValue,
+  )
+) {
+  return {
+    kind: "INVALID_ACTION_SNAPSHOT" as const,
+  };
+}
+
           const execution =
             await tx.execution.create({
               data: {
@@ -102,8 +239,8 @@ export const decisionExecutionRepository = {
 
                 status: "PENDING",
 
-                actionSnapshot:
-                  input.actionSnapshot,
+               actionSnapshot:
+  approval.actionSnapshot as Prisma.InputJsonValue,
               },
             });
 

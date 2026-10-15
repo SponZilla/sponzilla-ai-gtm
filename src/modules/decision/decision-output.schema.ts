@@ -116,6 +116,7 @@ export const gtmDecisionOutputSchema = z
 
     confidence: z
       .number()
+      .finite()
       .min(0)
       .max(1),
 
