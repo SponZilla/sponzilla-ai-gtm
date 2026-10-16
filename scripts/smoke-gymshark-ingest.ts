@@ -10,6 +10,17 @@ import { parseOpportunityV1 } from "@sponzilla/contracts/v1";
 import { gymsharkOpportunityV1Example } from "../packages/contracts/examples/gymshark-opportunity-v1.ts";
 
 const GTM_BASE = process.env.GTM_BASE_URL ?? "http://127.0.0.1:3000";
+const INTERNAL_ADMIN_API_KEY = process.env.INTERNAL_ADMIN_API_KEY;
+
+function adminHeaders(): HeadersInit {
+  if (!INTERNAL_ADMIN_API_KEY) {
+    throw new Error("INTERNAL_ADMIN_API_KEY must be configured for the GTM smoke test.");
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${INTERNAL_ADMIN_API_KEY}`,
+  };
+}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,10 +72,10 @@ async function main() {
   });
 
   const { res: ingestRes, body: ingestBody } = await fetchJson(
-    `${GTM_BASE}/api/v1/opportunities/ingest`,
+    `${GTM_BASE}/api/v1/market-intelligence/opportunities`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders(),
       body: JSON.stringify(validated),
     },
   );
@@ -95,6 +106,7 @@ async function main() {
 
   const { res: ctxRes, body: ctxBodyRaw } = await fetchJson(
     `${GTM_BASE}/api/v1/opportunities/${crmId}/decision-context`,
+    { headers: adminHeaders() },
   );
   const ctxBody = ctxBodyRaw as {
     data: {

@@ -25,7 +25,7 @@ export const gymsharkOpportunityV1Example: OpportunityV1 = {
       summary:
         'Public coverage indicates Gymshark expanding physical retail presence.',
       evidenceIds: ['ev_001'],
-      sourceUrl: 'https://example-news.com/gymshark-store',
+      sourceUrl: 'https://gymshark.com/pages/about-us',
       sourceTitle: 'Gymshark opens new store',
       detectedAt: '2026-09-23T10:00:00.000Z',
     },
@@ -41,7 +41,7 @@ export const gymsharkOpportunityV1Example: OpportunityV1 = {
       sourceId: 'src_001',
       source: {
         title: 'Gymshark opens new store',
-        url: 'https://example-news.com/gymshark-store',
+        url: 'https://gymshark.com/pages/about-us',
         type: 'news',
         publishedAt: '2026-09-01',
         verified: true,

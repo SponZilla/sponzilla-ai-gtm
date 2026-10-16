@@ -13,6 +13,10 @@ export const SourceV1Schema = z.object({
   snippet: z.string(),
   verificationStatus: SourceVerificationStatusSchema,
   capturedAt: z.string().datetime({ offset: true }).or(z.string().min(1)),
+  content: z.string().optional(),
+  contentHash: z.string().optional(),
+  retrievedAt: z.string().optional(),
+  priorityScore: z.number().min(0).max(100).optional(),
 });
 export type SourceV1 = z.infer<typeof SourceV1Schema>;
 
@@ -58,5 +62,10 @@ export const EvidenceV1Schema = z.object({
   }),
 
   confidenceScore: z.number().min(0).max(1),
+  sourceContentHash: z.string().optional(),
+  sourceExcerpt: z.string().optional(),
+  sourceExcerptStart: z.number().int().min(0).optional(),
+  sourceExcerptEnd: z.number().int().min(0).optional(),
+  retrievedAt: z.string().optional(),
 });
 export type EvidenceV1 = z.infer<typeof EvidenceV1Schema>;
