@@ -15,6 +15,14 @@ import {
   decisionRepository,
 } from "./decision.repository.js";
 
+import {
+  GTMEnrichmentService,
+} from "../../integrations/ai/gtm-enrichment.service.js";
+
+import {
+  GeminiProvider,
+} from "../../integrations/ai/gemini.provider.js";
+
 const DECISION_MODEL_VERSION =
   "deterministic-v1";
 
@@ -23,6 +31,22 @@ const DECISION_PROMPT_VERSION =
 
 const DECISION_POLICY_VERSION =
   "gtm-policy-v1";
+
+function getEnrichmentService(): GTMEnrichmentService | null {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const enabled = process.env.ENABLE_GEMINI_ENRICHMENT !== "false";
+
+  if (!apiKey || !enabled) {
+    return null;
+  }
+
+  try {
+    const provider = new GeminiProvider();
+    return new GTMEnrichmentService(provider);
+  } catch {
+    return null;
+  }
+}
 
 export class PendingDecisionExistsError
   extends Error {
@@ -46,6 +70,9 @@ export class PendingDecisionExistsError
 export const decisionService = {
   async generate(
     opportunityId: string,
+    options?: {
+      enrichmentService?: GTMEnrichmentService | null;
+    },
   ) {
     /*
      * 1. Build trusted decision context.
@@ -62,6 +89,39 @@ export const decisionService = {
       decisionEngineService.decide(
         context,
       );
+
+    /*
+     * 2b. Wire Gemini enrichment into decision explanation.
+     * If Gemini fails or is unconfigured, fallback cleanly to deterministic baseline.
+     */
+    let finalSummary = output.summary;
+    let finalReasoning = output.reasoning;
+    let modelVersion = DECISION_MODEL_VERSION;
+    let promptVersion = DECISION_PROMPT_VERSION;
+
+    const enrichment =
+      options?.enrichmentService !== undefined
+        ? options.enrichmentService
+        : getEnrichmentService();
+
+    if (enrichment) {
+      try {
+        const enriched = await enrichment.enrich(
+          context,
+          output,
+        );
+
+        if (enriched.status === "ENRICHED" && enriched.suggestion) {
+          finalSummary = enriched.suggestion.summary;
+          finalReasoning = enriched.suggestion.reasoning;
+          modelVersion =
+            process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+          promptVersion = "gtm-enrichment-v1";
+        }
+      } catch {
+        // Fallback silently to deterministic baseline
+      }
+    }
 
     /*
      * 3. Persist decision safely.
@@ -88,10 +148,10 @@ export const decisionService = {
               output.priority,
 
             summary:
-              output.summary,
+              finalSummary,
 
             reasoning:
-              output.reasoning,
+              finalReasoning,
 
             confidence:
               output.confidence,
@@ -104,11 +164,9 @@ export const decisionService = {
                 output.proposedAction,
               ),
 
-            modelVersion:
-              DECISION_MODEL_VERSION,
+            modelVersion,
 
-            promptVersion:
-              DECISION_PROMPT_VERSION,
+            promptVersion,
 
             policyVersion:
               DECISION_POLICY_VERSION,

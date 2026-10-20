@@ -6,6 +6,14 @@ import {
   decisionPreparationExecutor,
 } from "./decision-preparation.executor.js";
 
+import {
+  outreachEmailExecutor,
+} from "./outreach-email.executor.js";
+
+import {
+  crmUpdateExecutor,
+} from "./crm-update.executor.js";
+
 import type {
   DecisionActionExecutionContext,
   DecisionActionExecutionResult,
@@ -40,37 +48,37 @@ const executors:
     >
   > = {
     REQUEST_MORE_INFORMATION:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
 
     RESEARCH_COMPANY:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
 
     SEND_INTRODUCTION:
-      decisionPreparationExecutor,
+      outreachEmailExecutor,
 
     SEND_CASE_STUDY:
-      decisionPreparationExecutor,
+      outreachEmailExecutor,
 
     SEND_CAMPAIGN_PROPOSAL:
-      decisionPreparationExecutor,
+      outreachEmailExecutor,
 
     SCHEDULE_DISCOVERY_CALL:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
 
     FOLLOW_UP:
-      decisionPreparationExecutor,
+      outreachEmailExecutor,
 
     PREPARE_PRICING:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
 
     ESCALATE_TO_SALES:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
 
     WAIT:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
 
     CLOSE_OPPORTUNITY:
-      decisionPreparationExecutor,
+      crmUpdateExecutor,
   };
 
 export const decisionActionDispatcher = {

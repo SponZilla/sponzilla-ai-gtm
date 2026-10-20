@@ -1,6 +1,8 @@
 import {
   Prisma,
   type GTMActionType,
+  type InteractionType,
+  type OpportunityStage,
 } from "../../generated/prisma/client.js";
 
 import {
@@ -69,6 +71,83 @@ function jsonEquals(
   }
 
   return false;
+}
+
+function determineNextOpportunityStage(
+  currentStage: OpportunityStage,
+  action: GTMActionType,
+): OpportunityStage | null {
+  switch (action) {
+    case "SEND_INTRODUCTION":
+    case "SEND_CASE_STUDY":
+      return currentStage === "NEW" ? "CONTACTED" : currentStage;
+    case "SEND_CAMPAIGN_PROPOSAL":
+      return "PROPOSAL";
+    case "SCHEDULE_DISCOVERY_CALL":
+      return currentStage === "NEW" || currentStage === "CONTACTED"
+        ? "INTERESTED"
+        : currentStage;
+    case "ESCALATE_TO_SALES":
+      return "NEGOTIATION";
+    case "CLOSE_OPPORTUNITY":
+      return "LOST";
+    default:
+      return null;
+  }
+}
+
+function determineExecutionInteraction(
+  action: GTMActionType,
+): { type: InteractionType; summary: string } | null {
+  switch (action) {
+    case "SEND_INTRODUCTION":
+      return {
+        type: "EMAIL_SENT",
+        summary: "Sent introductory outreach email based on detected market signals.",
+      };
+    case "SEND_CASE_STUDY":
+      return {
+        type: "EMAIL_SENT",
+        summary: "Sent relevant case study to prospect via email.",
+      };
+    case "SEND_CAMPAIGN_PROPOSAL":
+      return {
+        type: "PROPOSAL_SENT",
+        summary: "Delivered customized campaign sponsorship proposal.",
+      };
+    case "FOLLOW_UP":
+      return {
+        type: "EMAIL_SENT",
+        summary: "Sent follow-up communication to maintain deal momentum.",
+      };
+    case "SCHEDULE_DISCOVERY_CALL":
+      return {
+        type: "CALL",
+        summary: "Initiated discovery call scheduling with key decision-makers.",
+      };
+    case "RESEARCH_COMPANY":
+      return {
+        type: "NOTE",
+        summary: "Completed company deep-dive research and identified target contacts.",
+      };
+    case "PREPARE_PRICING":
+      return {
+        type: "NOTE",
+        summary: "Prepared sponsorship pricing tiers and packaged deliverable options.",
+      };
+    case "ESCALATE_TO_SALES":
+      return {
+        type: "NOTE",
+        summary: "Escalated opportunity to senior sales team for active negotiation.",
+      };
+    case "CLOSE_OPPORTUNITY":
+      return {
+        type: "NOTE",
+        summary: "Closed opportunity in accordance with approved policy decision.",
+      };
+    default:
+      return null;
+  }
 }
 
 export const decisionExecutionRepository = {
@@ -430,15 +509,15 @@ async claimForExecution(
     });
   },
 
-/**
- * Atomically completes a prepared execution.
- *
- * Both the Execution and GTMDecision must
- * be in their expected states.
- *
- * Either both updates commit, or neither does.
- */
-async completeAtomically(
+  /**
+   * Atomically completes a prepared execution.
+   *
+   * Both the Execution and GTMDecision must
+   * be in their expected states.
+   *
+   * Either both updates commit, or neither does.
+   */
+  async completeAtomically(
   executionId: string,
   decisionId: string,
   result: Prisma.InputJsonValue,
@@ -537,6 +616,53 @@ await adminAuditRepository.create(
   },
   tx,
 );
+
+    /*
+     * 4. Feedback loop: Update Opportunity stage and record Interaction.
+     */
+    const decisionRecord = await tx.gTMDecision.findUnique({
+      where: { id: decisionId },
+      select: { opportunityId: true, action: true },
+    });
+
+    if (decisionRecord?.opportunityId) {
+      const now = new Date();
+      const currentOpp = await tx.opportunity.findUnique({
+        where: { id: decisionRecord.opportunityId },
+        select: { stage: true },
+      });
+
+      if (currentOpp) {
+        const nextStage = determineNextOpportunityStage(
+          currentOpp.stage,
+          decisionRecord.action,
+        );
+
+        await tx.opportunity.update({
+          where: { id: decisionRecord.opportunityId },
+          data: {
+            ...(nextStage && nextStage !== currentOpp.stage
+              ? { stage: nextStage }
+              : {}),
+            lastInteractionAt: now,
+          },
+        });
+
+        const interactionMeta = determineExecutionInteraction(
+          decisionRecord.action,
+        );
+        if (interactionMeta) {
+          await tx.interaction.create({
+            data: {
+              opportunityId: decisionRecord.opportunityId,
+              type: interactionMeta.type,
+              summary: interactionMeta.summary,
+              occurredAt: now,
+            },
+          });
+        }
+      }
+    }
 
     const completedExecution =
       await tx.execution.findUniqueOrThrow({
