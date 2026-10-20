@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
-  marketIntelligenceOpportunitySchema,
-} from "./market-intelligence.schema.js";
+  parseOpportunityV1,
+} from "@sponzilla/contracts/v1";
 
 const fixturePath = path.resolve(
   "tests/fixtures/market-intelligence-opportunity.json",
@@ -16,31 +16,20 @@ const raw = fs.readFileSync(
 
 const payload: unknown = JSON.parse(raw);
 
-const result =
-  marketIntelligenceOpportunitySchema.safeParse(
-    payload,
-  );
-
-if (!result.success) {
-  console.error(
-    result.error.flatten(),
-  );
-
-  process.exit(1);
-}
+const result = parseOpportunityV1(payload);
 
 console.log(
   "✓ Market Intelligence v1 contract valid",
 );
 
 console.log(
-  `Company: ${result.data.company.name}`,
+  `Company: ${result.company.name}`,
 );
 
 console.log(
-  `Signals: ${result.data.signals.length}`,
+  `Signals: ${result.signals.length}`,
 );
 
 console.log(
-  `Evidence: ${result.data.evidence.length}`,
+  `Evidence: ${result.evidence.length}`,
 );

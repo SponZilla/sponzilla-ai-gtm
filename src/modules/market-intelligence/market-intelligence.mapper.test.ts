@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
-  marketIntelligenceOpportunitySchema,
-} from "./market-intelligence.schema.js";
+  parseOpportunityV1,
+} from "@sponzilla/contracts/v1";
 
 import {
   mapMarketIntelligenceOpportunity,
@@ -20,8 +20,7 @@ const raw = fs.readFileSync(
 
 const payload: unknown = JSON.parse(raw);
 
-const validated =
-  marketIntelligenceOpportunitySchema.parse(payload);
+const validated = parseOpportunityV1(payload);
 
 const mapped =
   mapMarketIntelligenceOpportunity(validated);

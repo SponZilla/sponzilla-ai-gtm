@@ -1,12 +1,12 @@
 import type {
-  MarketIntelligenceOpportunityInput,
-} from "./market-intelligence.schema.js";
+  OpportunityV1,
+} from "@sponzilla/contracts/v1";
 
 export interface MappedMarketIntelligenceOpportunity {
   company: {
     name: string;
     website: string;
-    industry: string;
+    industry: string | null;
   };
 
   opportunity: {
@@ -20,9 +20,9 @@ export interface MappedMarketIntelligenceOpportunity {
 
     location: string;
 
-    signals: MarketIntelligenceOpportunityInput["signals"];
+    signals: OpportunityV1["signals"];
 
-    evidence: MarketIntelligenceOpportunityInput["evidence"];
+    evidence: OpportunityV1["evidence"];
 
     audience: string[];
 
@@ -38,46 +38,56 @@ export interface MappedMarketIntelligenceOpportunity {
   };
 }
 
+function confidenceScore(
+  confidence: OpportunityV1["confidence"],
+): number {
+  switch (confidence) {
+    case "HIGH":
+      return 0.85;
+    case "MEDIUM":
+      return 0.65;
+    case "LOW":
+      return 0.35;
+  }
+}
+
 export function mapMarketIntelligenceOpportunity(
-  input: MarketIntelligenceOpportunityInput,
+  input: OpportunityV1,
 ): MappedMarketIntelligenceOpportunity {
   return {
     company: {
       name: input.company.name,
-      website: input.company.website,
+      website: input.company.websiteUrl,
       industry: input.company.industry,
     },
 
     opportunity: {
-      title: input.recommendation.recommendation,
+      title: input.recommendation,
 
-      objective: input.aiInference.marketingNeed,
+      objective: input.marketingNeed,
     },
 
     intelligence: {
-        externalOpportunityId: input.opportunityId,
+      externalOpportunityId: input.id,
       contractVersion: input.contractVersion,
 
-      location: input.company.location,
+      location: input.company.location ?? "Unknown",
 
       signals: input.signals,
 
       evidence: input.evidence,
 
-      audience: input.aiInference.audience,
+      audience: [input.audience],
 
-      marketingNeed: input.aiInference.marketingNeed,
+      marketingNeed: input.marketingNeed,
 
-      interpretation: input.aiInference.interpretation,
+      interpretation: input.aiInference.groundedReasoning,
 
-      inferenceConfidence:
-        input.aiInference.confidence,
+      inferenceConfidence: confidenceScore(input.confidence),
 
-      recommendation:
-        input.recommendation.recommendation,
+      recommendation: input.recommendation,
 
-      nextActionHint:
-        input.recommendation.nextActionHint,
+      nextActionHint: input.nextActionHint,
     },
   };
 }

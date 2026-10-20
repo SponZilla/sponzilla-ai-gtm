@@ -1,6 +1,8 @@
 import { Router } from "express";
 
 import { asyncHandler } from "../../middleware/async-handler.js";
+import { adminRateLimiter } from "../../middleware/admin-rate-limiter.js";
+import { requireInternalAdmin } from "../../middleware/require-internal-admin.js";
 
 import {
   createOpportunity,
@@ -10,6 +12,11 @@ import {
 } from "./opportunity.controller.js";
 
 export const opportunityRouter = Router();
+
+opportunityRouter.use(
+  adminRateLimiter,
+  requireInternalAdmin,
+);
 
 opportunityRouter.post(
   "/ingest",

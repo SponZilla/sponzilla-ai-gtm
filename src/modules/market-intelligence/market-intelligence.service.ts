@@ -1,10 +1,9 @@
 import { Prisma } from "../../generated/prisma/client.js";
+import {
+  parseOpportunityV1,
+} from "@sponzilla/contracts/v1";
 
 import { prisma } from "../../lib/prisma.js";
-
-import {
-  marketIntelligenceOpportunitySchema,
-} from "./market-intelligence.schema.js";
 
 import {
   mapMarketIntelligenceOpportunity,
@@ -20,8 +19,7 @@ export async function ingestMarketIntelligenceOpportunity(
   /*
    * Never trust incoming service data.
    */
-  const validated =
-    marketIntelligenceOpportunitySchema.parse(payload);
+  const validated = parseOpportunityV1(payload);
 
   const mapped =
     mapMarketIntelligenceOpportunity(validated);
@@ -89,14 +87,13 @@ export async function ingestMarketIntelligenceOpportunity(
     const opportunity = await tx.opportunity.create({
       data: {
         companyId: company.id,
-
         title: mapped.opportunity.title,
-
-      source: "MARKET_INTELLIGENCE",
-      
+        source: "MARKET_INTELLIGENCE",
         stage: "NEW",
-
         objective: mapped.opportunity.objective,
+        externalId: validated.id,
+        intelligenceSnapshot: validated,
+        origin: validated.origin,
       },
     });
 
