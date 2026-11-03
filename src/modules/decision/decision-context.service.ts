@@ -269,6 +269,24 @@ export const decisionContextService = {
           record.company.industry,
       },
 
+      /*
+       * Contacts reachable at this company.
+       *
+       * The policy layer decides whether outreach is possible
+       * from their verification status; nothing is invented here.
+       */
+      contacts:
+        record.company.contacts.map(
+          (contact) => ({
+            id: contact.id,
+            name: contact.name,
+            title: contact.title,
+            email: contact.email,
+            emailStatus: contact.emailStatus,
+            linkedinUrl: contact.linkedinUrl,
+          }),
+        ),
+
       opportunity: {
         id:
           record.id,

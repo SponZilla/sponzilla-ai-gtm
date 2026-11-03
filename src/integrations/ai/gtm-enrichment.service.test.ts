@@ -45,6 +45,7 @@ function createContext(): GTMDecisionContext {
       website: "https://example.com",
       industry: "Technology",
     },
+    contacts: [],
     opportunity: {
       id: "opportunity-1",
       title: "Student campaign",

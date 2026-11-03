@@ -6,10 +6,12 @@ Decision engine, CRM opportunity orchestration, and human-in-the-loop action exe
 - **Canonical OpportunityV1 Ingestion**: Authenticated endpoint (`POST /api/v1/opportunities/ingest`) receiving opportunities from Market Intelligence.
 - **Dual-Layer Decision Engine**: Deterministic policy determines authoritative GTM actions; Gemini AI provides explanation enrichment.
 - **Human-in-the-Loop Gate**: Decisions require operator review (`AWAITING_APPROVAL` → `APPROVED` / `REJECTED`) before any external action.
-- **Real Execution**:
-  - `OutreachEmailExecutor`: Formats personalized outreach with verifiable message IDs.
-  - `CRMUpdateExecutor`: Manages internal CRM tasks and schedules.
-- **Closed-Loop Feedback**: Execution finalization atomically transitions `Opportunity.stage` and inserts an `Interaction` (`EMAIL_SENT`, `PROPOSAL_SENT`, `CALL`) in the same PostgreSQL transaction.
+- **Honest Execution Modes**:
+  - `OutreachEmailExecutor`: Prepares outreach drafts and reports `SIMULATED` / `NOT_SENT` until an email provider is configured.
+  - `CRMUpdateExecutor`: Prepares CRM actions and reports `PREPARATION_ONLY` / `NOT_APPLIED`.
+  - Executors declare `mode: "REAL_EXECUTION"` only when an external side effect actually happened.
+- **Contact Gate**: Outreach actions require a `VERIFIED` contact address. Without one the policy routes to `RESEARCH_COMPANY` instead of pretending to send.
+- **Closed-Loop Feedback**: Only a `REAL_EXECUTION` result atomically transitions `Opportunity.stage` and inserts an `Interaction` (`EMAIL_SENT`, `PROPOSAL_SENT`, `CALL`) in the same PostgreSQL transaction. Simulated results never mutate the CRM.
 - **Operator Loop & 5-Company Eval Gate**: Detailed in [docs/OPERATOR_LOOP_AND_EVAL_GATE.md](./docs/OPERATOR_LOOP_AND_EVAL_GATE.md).
 
 ## Getting Started

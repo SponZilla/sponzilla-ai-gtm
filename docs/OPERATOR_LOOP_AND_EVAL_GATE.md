@@ -45,7 +45,8 @@ The system bridges raw external market signals to verified GTM execution through
    │  - Dispatched to real executor:
    │      • Outreach Email Executor (SEND_INTRODUCTION, SEND_CASE_STUDY, SEND_CAMPAIGN_PROPOSAL, FOLLOW_UP)
    │      • CRM Update Executor (SCHEDULE_DISCOVERY_CALL, RESEARCH_COMPANY, CLOSE_OPPORTUNITY)
-   │  - Real execution outputs `mode: "REAL_EXECUTION"`, messageId, timestamps, status
+   │  - Executors declare `mode: "REAL_EXECUTION"` only when an external side effect happened;
+   │    without a provider they report `SIMULATED` / `PREPARATION_ONLY` and no messageId
    ▼
  [6. Closed-Loop Feedback] (ACID Transaction)
    │  - Execution status marked `SUCCEEDED`
@@ -90,12 +91,14 @@ The system bridges raw external market signals to verified GTM execution through
 - Transition: `AWAITING_APPROVAL` → `APPROVED` (or `REJECTED`).
 - Validation: Verifies that the approved action payload matches the proposed action snapshot byte-for-byte.
 
-### Step 5: Real Action Execution
+### Step 5: Action Execution (honest execution modes)
 - Approved decisions are claimed atomically (`PENDING` status).
 - Dispatched via `decisionActionDispatcher`:
   - `OutreachEmailExecutor`: Formats personalized outbound message grounded in detected signals, produces `messageId`, records delivery channel `EMAIL`.
   - `CRMUpdateExecutor`: Updates internal CRM tasks and schedules.
-- Produces `mode: "REAL_EXECUTION"` result payload.
+- Produces `mode: "REAL_EXECUTION"` only after a real provider/side effect confirms the action.
+  Until then executors return `SIMULATED` / `NOT_SENT` (outreach) or `PREPARATION_ONLY` /
+  `NOT_APPLIED` (CRM), and the CRM feedback loop in Step 6 does not run.
 
 ### Step 6: Closed-Loop Stage & Interaction Feedback
 - Atomic Database Finalization: Inside a single PostgreSQL transaction:

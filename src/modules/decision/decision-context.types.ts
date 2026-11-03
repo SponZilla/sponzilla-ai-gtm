@@ -24,6 +24,23 @@ export interface GTMCompanyContext {
   industry: string | null;
 }
 
+/**
+ * A reachable person at the target company.
+ *
+ * Only VERIFIED contacts with a persisted email address may be
+ * used as an outreach recipient. UNVERIFIED addresses (guessed,
+ * accept_all, never checked) and BOUNCED addresses must never be
+ * emailed.
+ */
+export interface GTMContactContext {
+  id: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  emailStatus: "UNVERIFIED" | "VERIFIED" | "BOUNCED";
+  linkedinUrl: string | null;
+}
+
 export interface GTMOpportunityContext {
   id: string;
   title: string;
@@ -75,6 +92,9 @@ export interface GTMDecisionContext {
   opportunity: GTMOpportunityContext;
   interactions: GTMInteractionContext[];
   history: GTMDecisionHistoryContext;
+
+  /** Reachable people known for this company. Empty when none are on file. */
+  contacts: GTMContactContext[];
 
   /** Canonical MI handoff payload when ingested; null for manual CRM-only deals. */
   intelligence: OpportunityV1 | null;

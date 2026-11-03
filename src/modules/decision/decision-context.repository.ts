@@ -25,6 +25,21 @@ export const decisionContextRepository = {
             name: true,
             website: true,
             industry: true,
+
+            contacts: {
+              select: {
+                id: true,
+                name: true,
+                title: true,
+                email: true,
+                emailStatus: true,
+                linkedinUrl: true,
+              },
+
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
           },
         },
 

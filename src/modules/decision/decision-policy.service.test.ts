@@ -39,6 +39,10 @@ function createContext(
       origin: null,
     },
 
+    contacts: [
+      createVerifiedContact(),
+    ],
+
     interactions: [],
 
     intelligence: null,
@@ -80,6 +84,17 @@ function createInteraction(
     occurredAt: new Date(
       "2026-01-01T10:00:00.000Z",
     ),
+  };
+}
+
+function createVerifiedContact(): GTMDecisionContext["contacts"][number] {
+  return {
+    id: "contact-1",
+    name: "Dana Reed",
+    title: "Head of Partnerships",
+    email: "dana.reed@example.com",
+    emailStatus: "VERIFIED",
+    linkedinUrl: null,
   };
 }
 
@@ -415,6 +430,150 @@ describe(
             .selectAction(context),
 
           "CLOSE_OPPORTUNITY",
+        );
+      },
+    );
+
+    /*
+     * Contact gate.
+     *
+     * Outreach requires a verified recipient. Without one the
+     * policy must not propose sending, because there is nobody to
+     * send to and any execution would be fabricated.
+     */
+    it(
+      "selects RESEARCH_COMPANY instead of outreach when no contacts are on file",
+      () => {
+        const context =
+          createContext({
+            contacts: [],
+          });
+
+        assert.equal(
+          decisionPolicyService
+            .selectAction(context),
+
+          "RESEARCH_COMPANY",
+        );
+      },
+    );
+
+    it(
+      "selects RESEARCH_COMPANY when the only contact is unverified",
+      () => {
+        const context =
+          createContext({
+            contacts: [
+              {
+                ...createVerifiedContact(),
+
+                emailStatus:
+                  "UNVERIFIED",
+              },
+            ],
+          });
+
+        assert.equal(
+          decisionPolicyService
+            .selectAction(context),
+
+          "RESEARCH_COMPANY",
+        );
+      },
+    );
+
+    it(
+      "never proposes outreach to a bounced contact",
+      () => {
+        const context =
+          createContext({
+            contacts: [
+              {
+                ...createVerifiedContact(),
+
+                emailStatus:
+                  "BOUNCED",
+              },
+            ],
+          });
+
+        assert.equal(
+          decisionPolicyService
+            .selectAction(context),
+
+          "RESEARCH_COMPANY",
+        );
+      },
+    );
+
+    it(
+      "selects RESEARCH_COMPANY when a verified contact has no address",
+      () => {
+        const context =
+          createContext({
+            contacts: [
+              {
+                ...createVerifiedContact(),
+
+                email: null,
+              },
+            ],
+          });
+
+        assert.equal(
+          decisionPolicyService
+            .selectAction(context),
+
+          "RESEARCH_COMPANY",
+        );
+      },
+    );
+
+    it(
+      "does not treat internal notes as prior outreach",
+      () => {
+        const context =
+          createContext({
+            interactions: [
+              createInteraction(
+                "NOTE",
+              ),
+            ],
+          });
+
+        assert.equal(
+          decisionPolicyService
+            .selectAction(context),
+
+          "SEND_INTRODUCTION",
+        );
+      },
+    );
+
+    /*
+     * The gate must not block actions that
+     * are not outreach.
+     */
+    it(
+      "still schedules a discovery call when no contact is verified",
+      () => {
+        const context =
+          createContext({
+            contacts: [],
+
+            opportunity: {
+              ...createContext()
+                .opportunity,
+
+              stage: "INTERESTED",
+            },
+          });
+
+        assert.equal(
+          decisionPolicyService
+            .selectAction(context),
+
+          "SCHEDULE_DISCOVERY_CALL",
         );
       },
     );

@@ -73,6 +73,29 @@ function jsonEquals(
   return false;
 }
 
+/*
+ * Reads the executor-declared mode from a stored result payload.
+ *
+ * Only REAL_EXECUTION means an external side effect actually
+ * happened. Every other mode (SIMULATED, PREPARATION_ONLY) is a
+ * successful preparation that must not mutate the CRM.
+ */
+function executedResultMode(
+  result: Prisma.InputJsonValue,
+): string | null {
+  if (
+    result === null ||
+    typeof result !== "object" ||
+    Array.isArray(result)
+  ) {
+    return null;
+  }
+
+  const mode = (result as Record<string, unknown>).mode;
+
+  return typeof mode === "string" ? mode : null;
+}
+
 function determineNextOpportunityStage(
   currentStage: OpportunityStage,
   action: GTMActionType,
@@ -128,7 +151,8 @@ function determineExecutionInteraction(
     case "RESEARCH_COMPANY":
       return {
         type: "NOTE",
-        summary: "Completed company deep-dive research and identified target contacts.",
+        summary:
+          "Outreach is blocked pending research: no verified contact is on file for this company.",
       };
     case "PREPARE_PRICING":
       return {
@@ -619,11 +643,21 @@ await adminAuditRepository.create(
 
     /*
      * 4. Feedback loop: Update Opportunity stage and record Interaction.
+     *
+     * Only a REAL_EXECUTION result may touch the CRM. A simulated or
+     * preparation-only result means no external action occurred, so
+     * advancing the stage or recording an email would fabricate
+     * pipeline history that later decisions treat as fact.
      */
-    const decisionRecord = await tx.gTMDecision.findUnique({
-      where: { id: decisionId },
-      select: { opportunityId: true, action: true },
-    });
+    const isRealExecution =
+      executedResultMode(result) === "REAL_EXECUTION";
+
+    const decisionRecord = isRealExecution
+      ? await tx.gTMDecision.findUnique({
+          where: { id: decisionId },
+          select: { opportunityId: true, action: true },
+        })
+      : null;
 
     if (decisionRecord?.opportunityId) {
       const now = new Date();

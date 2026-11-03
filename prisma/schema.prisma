@@ -14,11 +14,44 @@ model Company {
   industry String?
 
   opportunities Opportunity[]
+  contacts      Contact[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([name])
+}
+
+/// A reachable person at a company.
+///
+/// Email addresses are only trustworthy when emailStatus is VERIFIED.
+/// UNVERIFIED covers addresses that were guessed, returned as
+/// accept_all/unknown by a verification service, or never checked.
+model Contact {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name  String
+  title String?
+
+  email       String?
+  emailStatus EmailStatus @default(UNVERIFIED)
+
+  linkedinUrl String?
+
+  /// Where this contact was discovered (e.g. LINKEDIN, HUNTER, MANUAL).
+  sourceProvider String?
+  sourceUrl      String?
+
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, email])
+  @@index([companyId])
+  @@index([emailStatus])
 }
 
 model Opportunity {
@@ -228,6 +261,12 @@ model Outcome {
 
   @@index([decisionId, occurredAt])
   @@index([type])
+}
+
+enum EmailStatus {
+  UNVERIFIED
+  VERIFIED
+  BOUNCED
 }
 
 enum OpportunitySource {

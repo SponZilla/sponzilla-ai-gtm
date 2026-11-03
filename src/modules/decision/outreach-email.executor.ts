@@ -59,22 +59,29 @@ export class OutreachEmailExecutor implements DecisionActionExecutor {
         body = description;
     }
 
+    /*
+     * No email provider is configured yet, so nothing leaves
+     * this process. Report that honestly: the result must never
+     * claim a delivery that did not happen, because the closed
+     * loop turns this payload into CRM history.
+     */
     console.log(
-      `[OutreachEmailExecutor] Dispatched real outbound email: messageId=${messageId}, action=${action}`,
+      `[OutreachEmailExecutor] Prepared outreach preview (NOT SENT): draftId=${messageId}, action=${action}`,
     );
 
     return {
       result: {
-        mode: "REAL_EXECUTION",
+        mode: "SIMULATED",
         channel: "EMAIL",
         executionId: context.executionId,
         decisionId: context.decisionId,
         action,
-        status: "SENT",
-        messageId,
+        status: "NOT_SENT",
+        provider: null,
+        draftId: messageId,
         subject,
         bodyPreview: body.slice(0, 200),
-        sentAt,
+        preparedAt: sentAt,
       },
     };
   }
