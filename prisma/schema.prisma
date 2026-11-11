@@ -46,6 +46,8 @@ model Contact {
 
   verifiedAt DateTime?
 
+  outreachDrafts OutreachDraft[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -80,6 +82,7 @@ model Opportunity {
   interactions       Interaction[]
   decisions          GTMDecision[]
   marketIntelligence MarketIntelligenceOpportunity?
+  outreachDrafts     OutreachDraft[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -267,6 +270,48 @@ enum EmailStatus {
   UNVERIFIED
   VERIFIED
   BOUNCED
+}
+
+enum OutreachDraftStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+/// A generated outreach email awaiting explicit operator approval.
+///
+/// Nothing in this system sends email. An APPROVED draft is a
+/// reviewed artifact and an audit record, not a delivery.
+model OutreachDraft {
+  id String @id @default(uuid())
+
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  action GTMActionType @default(SEND_INTRODUCTION)
+
+  subject String
+  body    String
+
+  status OutreachDraftStatus @default(DRAFT)
+
+  /// Which model wrote this, and its exact inputs, for audit.
+  modelVersion  String?
+  promptVersion String?
+  inputSnapshot Json?
+
+  approvedAt DateTime?
+  approvedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([opportunityId])
+  @@index([contactId])
+  @@index([status])
 }
 
 enum OpportunitySource {

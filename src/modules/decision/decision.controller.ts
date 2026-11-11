@@ -41,10 +41,8 @@ const decisionParamsSchema = z.object({
 });
 
 const decisionApprovalBodySchema = z.object({
-  actorId: z.string().min(1),
-  actorName: z.string().min(1).optional(),
   comment: z.string().min(1).optional(),
-});
+}).strict();
 
 export async function generateDecision(
   req: Request,
@@ -162,7 +160,11 @@ async function resolveDecision(
       await decisionApprovalService.resolve(
         parsedParams.data.id,
         outcome,
-        parsedBody.data,
+        {
+          ...parsedBody.data,
+          actorId: res.locals.operator.id,
+          actorName: res.locals.operator.name,
+        },
       );
 
     return res.status(200).json({

@@ -12,6 +12,10 @@ import {
 } from "../../middleware/require-internal-admin.js";
 
 import {
+  requireSponzillaAdmin,
+} from "../../middleware/require-sponzilla-admin.js";
+
+import {
   adminRateLimiter,
 } from "../../middleware/admin-rate-limiter.js";
 
@@ -34,17 +38,11 @@ import {
 export const decisionRouter = Router();
 
 /**
- * Protect every decision endpoint.
- *
- * Rate limiting happens first so repeated
+ * Rate limiting happens before authentication so repeated
  * unauthorized requests are restricted.
- *
- * Authentication happens before any
- * business controller is executed.
  */
 decisionRouter.use(
   adminRateLimiter,
-  requireInternalAdmin,
 );
 
 /**
@@ -52,6 +50,7 @@ decisionRouter.use(
  */
 decisionRouter.get(
   "/opportunities/:id/decision-context",
+  requireInternalAdmin,
   asyncHandler(getDecisionContext),
 );
 
@@ -60,6 +59,7 @@ decisionRouter.get(
  */
 decisionRouter.post(
   "/opportunities/:id/decisions",
+  requireInternalAdmin,
   asyncHandler(generateDecision),
 );
 
@@ -68,6 +68,7 @@ decisionRouter.post(
  */
 decisionRouter.post(
   "/decisions/:id/approve",
+  requireSponzillaAdmin,
   asyncHandler(approveDecision),
 );
 
@@ -76,6 +77,7 @@ decisionRouter.post(
  */
 decisionRouter.post(
   "/decisions/:id/reject",
+  requireSponzillaAdmin,
   asyncHandler(rejectDecision),
 );
 
@@ -84,6 +86,7 @@ decisionRouter.post(
  */
 decisionRouter.post(
   "/decisions/:id/execute",
+  requireInternalAdmin,
   asyncHandler(executeDecision),
 );
 
@@ -92,6 +95,7 @@ decisionRouter.post(
  */
 decisionRouter.post(
   "/decisions/:id/outcomes",
+  requireInternalAdmin,
   asyncHandler(recordDecisionOutcome),
 );
 
@@ -100,5 +104,6 @@ decisionRouter.post(
  */
 decisionRouter.get(
   "/decisions/:id/outcomes",
+  requireInternalAdmin,
   asyncHandler(listDecisionOutcomes),
 );

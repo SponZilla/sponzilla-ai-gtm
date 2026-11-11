@@ -115,7 +115,7 @@ export const decisionService = {
           finalSummary = enriched.suggestion.summary;
           finalReasoning = enriched.suggestion.reasoning;
           modelVersion =
-            process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+            process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
           promptVersion = "gtm-enrichment-v1";
         }
       } catch {

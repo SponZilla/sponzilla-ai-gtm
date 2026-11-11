@@ -58,18 +58,34 @@ export const opportunityIngestService = {
       industry: opportunity.company.industry,
     });
 
+    const snapshotInput = {
+      externalId: opportunity.id,
+      companyId: company.id,
+      title: deriveTitle(opportunity),
+      source: "OUTBOUND" as const,
+      stage: "NEW" as const,
+      objective: opportunity.marketingNeed,
+      estimatedBudget: null,
+      origin: opportunity.origin,
+      intelligenceSnapshot: opportunity,
+    };
+
+    /*
+     * One unworked opportunity per company. Keying only on the research run id
+     * created a new opportunity (with its own empty contact list) on every
+     * run, so previously enriched contacts and drafts stayed attached to a row
+     * nobody was looking at any more.
+     */
+    const reusable =
+      await opportunityRepository.findReusableForIntelligence(company.id);
+
     const crmOpportunity =
-      await opportunityRepository.upsertFromIntelligence({
-        externalId: opportunity.id,
-        companyId: company.id,
-        title: deriveTitle(opportunity),
-        source: "OUTBOUND",
-        stage: "NEW",
-        objective: opportunity.marketingNeed,
-        estimatedBudget: null,
-        origin: opportunity.origin,
-        intelligenceSnapshot: opportunity,
-      });
+      reusable && reusable.externalId !== opportunity.id
+        ? await opportunityRepository.refreshFromIntelligence(
+            reusable.id,
+            snapshotInput,
+          )
+        : await opportunityRepository.upsertFromIntelligence(snapshotInput);
 
     return {
       company,

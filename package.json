@@ -9,13 +9,18 @@
   ],
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "prebuild": "npm run db:generate",
     "build": "npm run build --workspace=@sponzilla/contracts && tsc",
     "start": "node dist/server.js",
+    "pretypecheck": "npm run db:generate",
     "typecheck": "tsc --noEmit",
-    "test:decision-policy": "tsx --test src/modules/decision/decision-policy.service.test.ts",
+    "test": "node scripts/run-tests.mjs",
+    "test:decision-policy": "node --import tsx --test src/modules/decision/decision-policy.service.test.ts",
     "db:migrate": "prisma migrate deploy --config prisma7.config.ts",
     "db:generate": "prisma generate --config prisma7.config.ts",
-    "smoke:gymshark": "tsx scripts/smoke-gymshark-ingest.ts"
+    "smoke:gymshark": "tsx scripts/smoke-gymshark-ingest.ts",
+    "smoke:decision-engine": "tsx scripts/smoke-decision-engine.ts",
+    "smoke:decision-service": "tsx scripts/smoke-decision-service.ts"
   },
   "keywords": [],
   "author": "",

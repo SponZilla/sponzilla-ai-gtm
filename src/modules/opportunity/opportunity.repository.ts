@@ -68,6 +68,42 @@ export const opportunityRepository = {
     });
   },
 
+  /**
+   * The freshest ingestion-created opportunity for a company that an operator
+   * has not worked yet (still NEW). A later research run refreshes that row
+   * instead of adding one duplicate per run.
+   */
+  findReusableForIntelligence(companyId: string) {
+    return prisma.opportunity.findFirst({
+      where: {
+        companyId,
+        externalId: { not: null },
+        stage: "NEW",
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+  },
+
+  refreshFromIntelligence(
+    id: string,
+    input: UpsertOpportunityFromIntelligenceInput,
+  ) {
+    return prisma.opportunity.update({
+      where: { id },
+      data: {
+        companyId: input.companyId,
+        title: input.title,
+        objective: input.objective,
+        origin: input.origin,
+        externalId: input.externalId,
+        intelligenceSnapshot: input.intelligenceSnapshot,
+      },
+      include: {
+        company: true,
+      },
+    });
+  },
+
   upsertFromIntelligence(
     input: UpsertOpportunityFromIntelligenceInput,
   ) {

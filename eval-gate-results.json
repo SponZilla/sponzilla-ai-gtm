@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-11-09T11:47:23.802Z",
+  "gtmBase": "http://127.0.0.1:3000",
+  "miBase": "http://127.0.0.1:3001",
+  "note": "Operator identity for approvals was provided by the local eval auth stub; the real requireSponzillaAdmin middleware executed unchanged.",
+  "results": [
+    {
+      "company": "Duolingo",
+      "websiteUrl": "https://duolingo.com",
+      "targetSignal": "youth / campus marketing and social campaign",
+      "steps": {},
+      "checks": {
+        "researchCompleted": true,
+        "groundedSources": false,
+        "noInventedBudget": true,
+        "noInventedEmails": true,
+        "handoff": true
+      },
+      "intelligence": {
+        "researchRunId": "run_4bd9235199167374",
+        "researchStatus": "COMPLETED",
+        "researchError": null,
+        "sourceCount": 0,
+        "evidenceCount": 0,
+        "signalCount": 0,
+        "signalTypes": [],
+        "evidenceUrlsValid": true,
+        "decisionMakers": 0,
+        "decisionMakerEmails": 0,
+        "decisionMakerLinksValid": true,
+        "qualificationStatus": "NO_VERIFIED_OPPORTUNITY",
+        "confidence": "LOW",
+        "estimatedBudget": null,
+        "opportunityId": "opp_0c611775ca07cd5d",
+        "handoff": {
+          "status": "SKIPPED",
+          "gtmOpportunityId": null,
+          "error": null
+        }
+      }
+    }
+  ]
+}
