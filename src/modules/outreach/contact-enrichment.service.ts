@@ -19,6 +19,14 @@ import {
   type EmailLookupResult,
 } from "./hunter-email.provider.js";
 
+import {
+  buildEnrichmentCacheKeys,
+} from "./enrichment-cache.keys.js";
+import {
+  readEnrichmentLookup,
+  writeEnrichmentLookup,
+  type EnrichmentCacheStats,
+} from "./enrichment-cache.service.js";
 import { rankTargets, type RankedTarget } from "./persona.ranking.js";
 
 export class OutreachOpportunityNotFoundError extends Error {
@@ -55,6 +63,8 @@ export interface EnrichmentReport {
   targets: RankedTarget[];
   contacts: ContactSummary[];
   skipped: SkippedTarget[];
+  /** How many lookups were answered from the cache instead of a provider. */
+  cache: EnrichmentCacheStats;
 }
 
 export function extractDomain(website: string | null): string | null {
@@ -167,6 +177,7 @@ export async function enrichOutreachContacts(
 
   const skipped: SkippedTarget[] = [];
   const saved: ContactSummary[] = [];
+  const cache: EnrichmentCacheStats = { hits: 0, misses: 0 };
 
   for (const target of targets.slice(0, limit)) {
     if (!target.name) {
@@ -197,13 +208,37 @@ export async function enrichOutreachContacts(
 
     const { firstName, lastName } = splitFullName(target.name);
 
-    let lookup: EmailLookupResult | null = null;
+    /*
+     * Ask the cache before any provider. The same person shows up across
+     * opportunities, and their address does not change because our opportunity
+     * did, so a second question must not cost a second credit.
+     */
+    const cacheKeys = buildEnrichmentCacheKeys({
+      name: target.name,
+      domain,
+      linkedinUrl: target.linkedinUrl,
+    });
+
+    let lookup: EmailLookupResult | null = await readEnrichmentLookup(cacheKeys);
+    const servedFromCache = Boolean(lookup);
+
+    if (servedFromCache) {
+      cache.hits += 1;
+    } else {
+      cache.misses += 1;
+    }
+
     let providerFailed = false;
 
-    if (hunterConfigured) {
+    if (!servedFromCache && hunterConfigured) {
       try {
         lookup = await findEmailWithHunter(
-          { firstName, lastName, domain },
+          {
+            firstName,
+            lastName,
+            domain,
+            linkedinUrl: target.linkedinUrl,
+          },
           { fetchImpl: options.fetchImpl },
         );
       } catch (error) {
@@ -220,7 +255,11 @@ export async function enrichOutreachContacts(
      * found nothing or could not confirm it, so a confirmed address never
      * costs two credits.
      */
-    if (apolloConfigured && (!lookup || lookup.emailStatus !== "VERIFIED")) {
+    if (
+      !servedFromCache &&
+      apolloConfigured &&
+      (!lookup || lookup.emailStatus !== "VERIFIED")
+    ) {
       try {
         const apolloLookup = await findEmailWithApollo(
           {
@@ -246,6 +285,14 @@ export async function enrichOutreachContacts(
           throw error;
         }
       }
+    }
+
+    /*
+     * A cached answer already reflects both providers. A provider error is not
+     * cached, or one bad afternoon would look like a permanent miss.
+     */
+    if (!servedFromCache && !providerFailed) {
+      await writeEnrichmentLookup(cacheKeys, lookup);
     }
 
     if (!lookup) {
@@ -328,5 +375,6 @@ export async function enrichOutreachContacts(
     targets,
     contacts: saved,
     skipped,
+    cache,
   };
 }

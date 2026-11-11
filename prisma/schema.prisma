@@ -56,6 +56,35 @@ model Contact {
   @@index([emailStatus])
 }
 
+/// One enrichment answer, cached so the same identity is never paid for twice.
+/// keyType is LINKEDIN_HANDLE or NAME_DOMAIN. A miss is stored as well
+/// (hit = false) so a repeat lookup does not spend credits or latency again.
+model EnrichmentLookup {
+  id       String @id @default(uuid())
+  provider String
+
+  keyType String
+  keyHash String
+  /// Readable form of the hashed key, for debugging a row by eye.
+  lookupKey String
+
+  hit         Boolean
+  email       String?
+  emailStatus EmailStatus?
+  confidence  Int?
+  sourceUrl   String?
+  linkedinUrl String?
+
+  creditsUsed Int @default(0)
+  expiresAt   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, keyType, keyHash])
+  @@index([expiresAt])
+}
+
 model Opportunity {
   id        String @id @default(uuid())
   companyId String

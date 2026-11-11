@@ -98,7 +98,9 @@ export async function findEmailWithApollo(
 
   if (input.firstName) params.set("first_name", input.firstName);
   if (input.lastName) params.set("last_name", input.lastName);
-  if (input.domain) params.set("domain", input.domain);
+  if (input.domain) {
+    params.set("domain", input.domain);
+  }
   if (input.companyName) params.set("organization_name", input.companyName);
   if (input.linkedinUrl) params.set("linkedin_url", input.linkedinUrl);
 
