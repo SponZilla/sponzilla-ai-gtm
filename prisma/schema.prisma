@@ -98,14 +98,20 @@ model Opportunity {
 
   lastInteractionAt DateTime?
 
-  /// Stable external Market Intelligence opportunity ID.
-  externalId String? @unique
+  /// Stable Market Intelligence opportunity ID. Unique per owner rather than
+  /// globally: the same research run is a separate card for each user who
+  /// asked for it, and one user must never inherit another's card.
+  externalId String?
 
   /// Full validated OpportunityV1 payload used by Decision Context.
   intelligenceSnapshot Json?
 
   /// Provenance of the opportunity, for example MARKET_INTELLIGENCE.
   origin String?
+
+  /// Operator who claimed this card. Null is unclaimed intake, visible to any
+  /// operator; once claimed the card belongs to that operator alone.
+  ownerId String?
 
   company            Company                        @relation(fields: [companyId], references: [id], onDelete: Restrict)
   interactions       Interaction[]
@@ -119,6 +125,8 @@ model Opportunity {
   @@index([companyId])
   @@index([stage])
   @@index([companyId, stage])
+  @@index([ownerId])
+  @@index([externalId, ownerId])
 }
 
 model MarketIntelligenceOpportunity {

@@ -32,6 +32,13 @@ const envSchema = z.object({
   APOLLO_ENRICHMENT_ENABLED: z.string().default("false"),
 
   /*
+   * Owner written onto a card when the ingest caller supplies no user. Used by
+   * a single-operator pilot so a generated card is not orphaned; in multi-user
+   * operation the research request carries the real operator id instead.
+   */
+  GTM_DEFAULT_OWNER_ID: z.string().min(1).optional(),
+
+  /*
    * Outreach drafting. Without the key, draft generation fails
    * with an explicit 503 instead of producing generic copy.
    */

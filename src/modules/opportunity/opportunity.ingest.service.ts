@@ -37,7 +37,11 @@ function deriveTitle(opp: OpportunityV1): string {
  * No other reshape — contract fields pass through into the snapshot as-is.
  */
 export const opportunityIngestService = {
-  async ingest(rawBody: unknown) {
+  /**
+   * `ownerId` is the user whose research request produced this payload. The
+   * card belongs to them from the moment it exists; there is no later claim.
+   */
+  async ingest(rawBody: unknown, ownerId: string | null = null) {
     let opportunity: OpportunityV1;
 
     try {
@@ -68,6 +72,7 @@ export const opportunityIngestService = {
       estimatedBudget: null,
       origin: opportunity.origin,
       intelligenceSnapshot: opportunity,
+      ownerId,
     };
 
     /*
@@ -76,8 +81,10 @@ export const opportunityIngestService = {
      * run, so previously enriched contacts and drafts stayed attached to a row
      * nobody was looking at any more.
      */
-    const reusable =
-      await opportunityRepository.findReusableForIntelligence(company.id);
+    const reusable = await opportunityRepository.findReusableForIntelligence(
+      company.id,
+      ownerId,
+    );
 
     const crmOpportunity =
       reusable && reusable.externalId !== opportunity.id
@@ -85,7 +92,20 @@ export const opportunityIngestService = {
             reusable.id,
             snapshotInput,
           )
-        : await opportunityRepository.upsertFromIntelligence(snapshotInput);
+        : await (async () => {
+            const existing =
+              await opportunityRepository.findByExternalIdAndOwner(
+                opportunity.id,
+                ownerId,
+              );
+
+            return existing
+              ? opportunityRepository.refreshFromIntelligence(
+                  existing.id,
+                  snapshotInput,
+                )
+              : opportunityRepository.createFromIntelligence(snapshotInput);
+          })();
 
     return {
       company,

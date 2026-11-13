@@ -10,6 +10,7 @@ import {
   createOutreachDraft,
   enrichContacts,
   getOutreachTargets,
+  listMyOpportunities,
   listOutreachDrafts,
   rejectOutreachDraft,
 } from "./outreach.controller.js";
@@ -21,6 +22,19 @@ export const outreachRouter = Router();
  * requests are restricted.
  */
 outreachRouter.use(adminRateLimiter);
+
+/**
+ * The operator's own cards only: those generated from their own research
+ * requests. There is no shared pool, so nothing here is claimable.
+ *
+ * Kept under /outreach/ so it cannot be shadowed by the internal-admin
+ * opportunity router mounted on /api/v1/opportunities.
+ */
+outreachRouter.get(
+  "/outreach/opportunities",
+  requireSponzillaAdmin,
+  asyncHandler(listMyOpportunities),
+);
 
 /**
  * Who to contact, ranked by persona fit, with LinkedIn URLs.

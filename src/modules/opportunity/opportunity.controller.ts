@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 
+import { env } from "../../config/env.js";
+
 import {
   CompanyNotFoundError,
   opportunityService,
@@ -20,9 +22,21 @@ export async function ingestOpportunity(
   req: Request,
   res: Response,
 ) {
+  /*
+   * The card belongs to the user whose research produced it. Market
+   * Intelligence forwards that user in a header; when it does not (an older
+   * caller, or a scheduled run), GTM_DEFAULT_OWNER_ID pins the card to the
+   * single operator a pilot has.
+   */
+  const ownerId =
+    req.header("x-operator-id")?.trim() ||
+    env.GTM_DEFAULT_OWNER_ID?.trim() ||
+    null;
+
   try {
     const result = await opportunityIngestService.ingest(
       req.body,
+      ownerId,
     );
 
     return res.status(201).json({

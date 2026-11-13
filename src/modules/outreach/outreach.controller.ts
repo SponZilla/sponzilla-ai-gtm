@@ -21,6 +21,12 @@ import {
   outreachDraftService,
 } from "./outreach-draft.service.js";
 
+import { opportunityOwnershipService } from "./opportunity-ownership.service.js";
+
+interface OperatorLocals {
+  operator: { id: string; name: string };
+}
+
 const opportunityParamsSchema = z.object({ id: z.string().uuid() });
 const draftParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -42,6 +48,21 @@ const createDraftBodySchema = z
       .optional(),
   })
   .strict();
+
+/**
+ * The operator's own cards: the ones generated from their research requests.
+ * Scoped in the query, so another user's card is not merely hidden in the
+ * browser — it is never sent to this user at all.
+ */
+export async function listMyOpportunities(_req: Request, res: Response) {
+  const { operator } = res.locals as OperatorLocals;
+
+  const opportunities = await opportunityOwnershipService.listForOperator(
+    operator.id,
+  );
+
+  return res.status(200).json({ data: opportunities });
+}
 
 export async function getOutreachTargets(req: Request, res: Response) {
   const parsed = opportunityParamsSchema.safeParse(req.params);

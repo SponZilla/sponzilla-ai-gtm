@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+dist
+build
+.git
+.github
+tmp
+docs
+*.log
+.env
+.env.*
+!.env.example
+eval-gate-results.json
+coverage
+.DS_Store
